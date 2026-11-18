@@ -565,6 +565,11 @@ with gr.Blocks(theme=vice_city_theme, css=CUSTOM_CSS, title="CLIZZER - Vice City
     )
 
 
+def create_gradio_app():
+    """Return the initialized Gradio Blocks application."""
+    return demo
+
+
 # ==============================================================================
 # FASTAPI APPLICATION & ENDPOINTS
 # ==============================================================================
