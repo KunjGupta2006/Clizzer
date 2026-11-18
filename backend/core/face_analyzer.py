@@ -314,6 +314,12 @@ class FaceAnalyzer:
         if h <= 0 or w <= 0:
             return []
 
+        # Downscale frame to <=640px for blazing fast CPU inference
+        if max(h, w) > 640:
+            scale = 640.0 / max(h, w)
+            frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
+            h, w = frame.shape[:2]
+
         detected_faces: list[FaceFrame] = []
 
         # Attempt MediaPipe detection and mesh

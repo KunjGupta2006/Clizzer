@@ -157,23 +157,46 @@ export default function ClipWorkspacePage() {
         setCurrentStep('MISSION_COMPLETE');
         setStatusMessage('Clips extracted successfully!');
 
-        // Populate clips or generate realistic preview objects if running demo
-        const clipsData: GeneratedClip[] = (data.clips && data.clips.length > 0)
-          ? data.clips
-          : Array.from({ length: numClips }, (_, i) => ({
-              clip_path: `/api/clips/clip_${i + 1}.mp4`,
-              thumbnail_path: null,
-              start_time: i * 45 + 12,
-              end_time: i * 45 + 12 + maxDuration,
-              duration: maxDuration,
-              hype_score: Math.min(5, Math.max(3, 5 - i * 0.5)),
-            }));
+        if (data.clips && data.clips.length > 0) {
+          const clipsData: GeneratedClip[] = data.clips.map((c: any, i: number) => {
+            if (typeof c === 'string') {
+              const filename = c.split(/[\\/]/).pop();
+              return {
+                clip_path: c.startsWith('http') ? c : `${apiUrl}/clips/${filename}`,
+                thumbnail_path: null,
+                start_time: i * 30,
+                end_time: (i + 1) * 30,
+                duration: maxDuration,
+                hype_score: Math.max(3, 5 - i * 0.5),
+              };
+            }
+            const clipFilename = (c.clip_path || '').split(/[\\/]/).pop();
+            const thumbFilename = c.thumbnail_path ? (c.thumbnail_path || '').split(/[\\/]/).pop() : null;
+            return {
+              clip_path: (c.clip_path && c.clip_path.startsWith('http')) ? c.clip_path : `${apiUrl}/clips/${clipFilename}`,
+              thumbnail_path: thumbFilename ? (c.thumbnail_path.startsWith('http') ? c.thumbnail_path : `${apiUrl}/clips/${thumbFilename}`) : null,
+              start_time: c.start_time ?? (i * 30),
+              end_time: c.end_time ?? ((i + 1) * 30),
+              duration: c.duration ?? maxDuration,
+              hype_score: c.hype_score ?? Math.max(3, 5 - i * 0.5),
+            };
+          });
 
-        setGeneratedClips(clipsData);
-        setIsProcessing(false);
-        setShowMissionComplete(true);
+          setGeneratedClips(clipsData);
+          setIsProcessing(false);
+          setShowMissionComplete(true);
+        } else {
+          setIsProcessing(false);
+          setErrorMessage('NO FIRE CLIPS DETECTED IN FOOTAGE. TRY A DIFFERENT VIDEO.');
+          setShowWasted(true);
+        }
       } else {
-        throw new Error('Backend failed to process video.');
+        let errDetail = 'Backend failed to process video.';
+        try {
+          const errData = await response.json();
+          if (errData.detail) errDetail = errData.detail;
+        } catch {}
+        throw new Error(errDetail);
       }
     } catch (err: any) {
       setIsProcessing(false);

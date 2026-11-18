@@ -229,8 +229,31 @@ def render_wanted_stars(stars: int = 0, message: str = "MISSION STANDBY") -> str
 # PIPELINE INVOCATION HELPER
 # ==============================================================================
 
+import asyncio
+
+def run_coroutine_sync(coro):
+    """Safely execute a coroutine from synchronous threads."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(asyncio.run, coro).result()
+        else:
+            return loop.run_until_complete(coro)
+    except RuntimeError:
+        return asyncio.run(coro)
+
+
 def execute_pipeline(pipeline_instance: Any, source: str, num_clips: int, max_duration: int, callback=None) -> List[str]:
-    """Execute pipeline instance with dynamic signature matching."""
+    """Execute pipeline instance with dynamic signature matching and await async execution."""
+    if hasattr(pipeline_instance, "hype_engine") and pipeline_instance.hype_engine is not None:
+        pipeline_instance.hype_engine.num_clips = int(num_clips)
+        pipeline_instance.hype_engine.max_clip_duration = float(max_duration)
+    if hasattr(pipeline_instance, "config") and isinstance(pipeline_instance.config, dict):
+        pipeline_instance.config["num_clips"] = int(num_clips)
+        pipeline_instance.config["max_clip_duration"] = float(max_duration)
+
     target_func = None
     if hasattr(pipeline_instance, "process"):
         target_func = pipeline_instance.process
@@ -245,24 +268,48 @@ def execute_pipeline(pipeline_instance: Any, source: str, num_clips: int, max_du
     params = sig.parameters
     kwargs = {}
 
-    if "num_clips" in params:
-        kwargs["num_clips"] = num_clips
-    if "max_duration" in params:
-        kwargs["max_duration"] = max_duration
-
-    # Map progress callback
     if "progress_callback" in params or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
         kwargs["progress_callback"] = callback
     elif "callback" in params:
         kwargs["callback"] = callback
 
-    # Invoke with positional or explicit parameter name
+    if "num_clips" in params:
+        kwargs["num_clips"] = int(num_clips)
+    if "max_duration" in params:
+        kwargs["max_duration"] = int(max_duration)
+
     try:
-        return target_func(source, **kwargs)
+        raw_res = target_func(source, **kwargs)
     except TypeError:
-        first_param = list(params.keys())[0] if params else "source"
+        first_param = list(params.keys())[0] if params else "video_input"
         kwargs[first_param] = source
-        return target_func(**kwargs)
+        raw_res = target_func(**kwargs)
+
+    # Await if coroutine was returned
+    if inspect.iscoroutine(raw_res):
+        raw_res = run_coroutine_sync(raw_res)
+
+    output_paths: List[str] = []
+    if isinstance(raw_res, dict) and "clips" in raw_res:
+        clips_data = raw_res["clips"]
+        if isinstance(clips_data, list):
+            for item in clips_data:
+                if isinstance(item, dict) and "clip_path" in item:
+                    p = str(item["clip_path"])
+                    if os.path.exists(p):
+                        output_paths.append(p)
+                elif isinstance(item, str) and os.path.exists(item):
+                    output_paths.append(item)
+    elif isinstance(raw_res, list):
+        for item in raw_res:
+            if isinstance(item, dict) and "clip_path" in item:
+                p = str(item["clip_path"])
+                if os.path.exists(p):
+                    output_paths.append(p)
+            elif isinstance(item, str) and os.path.exists(item):
+                output_paths.append(item)
+
+    return output_paths
 
 
 # ==============================================================================
@@ -522,6 +569,11 @@ with gr.Blocks(theme=vice_city_theme, css=CUSTOM_CSS, title="CLIZZER - Vice City
 # FASTAPI APPLICATION & ENDPOINTS
 # ==============================================================================
 
+from fastapi.staticfiles import StaticFiles
+from fastapi import UploadFile, File, Form
+import shutil
+from pathlib import Path
+
 app = FastAPI(
     title="Clizzer API",
     description="GTA Vice City-themed AI Video Clipper API & Server",
@@ -537,19 +589,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount clips output directory for direct HTTP video streaming and downloads
+output_dir = Path("output").resolve()
+clips_dir = output_dir / "clips"
+clips_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/clips", StaticFiles(directory=str(clips_dir)), name="clips")
+
+
+class ClipItem(BaseModel):
+    clip_path: str
+    thumbnail_path: Optional[str] = None
+    start_time: float = 0.0
+    end_time: float = 0.0
+    duration: float = 0.0
+    hype_score: float = 5.0
+
 
 class ProcessRequest(BaseModel):
     url: Optional[str] = Field(None, description="Video URL (e.g. YouTube, Twitch)")
     video_path: Optional[str] = Field(None, description="Local or uploaded video file path")
     num_clips: int = Field(default=4, ge=1, le=6, description="Number of clips to generate")
     max_duration: int = Field(default=30, ge=10, le=90, description="Max duration in seconds")
+    reframe: bool = Field(default=True, description="Enable 9:16 vertical crop")
+    subtitle_style: str = Field(default="karaoke", description="Subtitle animation style")
 
 
 class ProcessResponse(BaseModel):
     status: str
     message: str
-    clips: List[str]
+    clips: List[Any]
     num_clips: int
+    video_title: Optional[str] = None
 
 
 @app.get("/health")
@@ -565,7 +635,7 @@ async def health_check():
 
 @app.post("/process", response_model=ProcessResponse)
 async def process_video_endpoint(payload: ProcessRequest):
-    """Process video via API and return generated clip file paths."""
+    """Process video via API and return generated clip file paths and web URLs."""
     input_source = payload.video_path if payload.video_path else payload.url
     if not input_source or not str(input_source).strip():
         raise HTTPException(
@@ -575,21 +645,79 @@ async def process_video_endpoint(payload: ProcessRequest):
 
     try:
         pipeline = ClipperPipeline()
-        clips = execute_pipeline(
-            pipeline_instance=pipeline,
-            source=str(input_source).strip(),
-            num_clips=payload.num_clips,
-            max_duration=payload.max_duration,
-            callback=None,
-        )
+        if hasattr(pipeline, "hype_engine") and pipeline.hype_engine is not None:
+            pipeline.hype_engine.num_clips = int(payload.num_clips)
+            pipeline.hype_engine.max_clip_duration = float(payload.max_duration)
+        if hasattr(pipeline, "config") and isinstance(pipeline.config, dict):
+            pipeline.config["num_clips"] = int(payload.num_clips)
+            pipeline.config["max_clip_duration"] = float(payload.max_duration)
+
+        res = await pipeline.process(str(input_source).strip())
+        raw_clips = res.get("clips", []) if isinstance(res, dict) else []
+        video_title = res.get("video_title", "highlight_video") if isinstance(res, dict) else "video"
+
+        formatted_clips = []
+        for idx, item in enumerate(raw_clips):
+            if isinstance(item, dict):
+                local_path = item.get("clip_path", "")
+                fname = os.path.basename(local_path)
+                web_clip_url = f"http://localhost:7860/clips/{fname}"
+                thumb_local = item.get("thumbnail_path")
+                thumb_url = f"http://localhost:7860/clips/{os.path.basename(thumb_local)}" if thumb_local else None
+
+                formatted_clips.append({
+                    "clip_path": web_clip_url,
+                    "thumbnail_path": thumb_url,
+                    "start_time": float(item.get("start_time", 0.0)),
+                    "end_time": float(item.get("end_time", 0.0)),
+                    "duration": float(item.get("duration", 0.0)),
+                    "hype_score": float(item.get("hype_score", 4.5)),
+                })
+            elif isinstance(item, str):
+                fname = os.path.basename(item)
+                formatted_clips.append({
+                    "clip_path": f"http://localhost:7860/clips/{fname}",
+                    "thumbnail_path": None,
+                    "start_time": 0.0,
+                    "end_time": float(payload.max_duration),
+                    "duration": float(payload.max_duration),
+                    "hype_score": 4.5,
+                })
+
         return ProcessResponse(
             status="success",
-            message=f"Successfully generated {len(clips or [])} clips",
-            clips=clips or [],
-            num_clips=len(clips or []),
+            message=f"Successfully generated {len(formatted_clips)} clips",
+            clips=formatted_clips,
+            num_clips=len(formatted_clips),
+            video_title=video_title,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/process-upload")
+async def process_upload_endpoint(
+    file: UploadFile = File(...),
+    num_clips: int = Form(4),
+    max_duration: int = Form(30),
+    reframe: bool = Form(True),
+    subtitle_style: str = Form("karaoke"),
+):
+    """Process uploaded video file."""
+    upload_dir = Path("output/uploads").resolve()
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    temp_file = upload_dir / f"upload_{int(time.time())}_{file.filename}"
+    with open(temp_file, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    req = ProcessRequest(
+        video_path=str(temp_file),
+        num_clips=num_clips,
+        max_duration=max_duration,
+        reframe=reframe,
+        subtitle_style=subtitle_style,
+    )
+    return await process_video_endpoint(req)
 
 
 # Alias endpoint for /api/process and /api/health

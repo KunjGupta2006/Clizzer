@@ -886,7 +886,8 @@ class ClipperPipeline:
 
         # Cut individual clips
         for idx, window in enumerate(clip_windows, start=1):
-            clip_filename = f"{video_title}_clip_{idx:02d}_{int(window.start_time)}s_to_{int(window.end_time)}s.mp4"
+            safe_title = re.sub(r'[\\/*?:"<>|]', '_', video_title).strip()[:40] or "video"
+            clip_filename = f"{safe_title}_clip_{idx:02d}_{int(window.start_time)}s_to_{int(window.end_time)}s.mp4"
             clip_file_path = str(clips_dir / clip_filename)
 
             def cut_single_clip(w=window, out_path=clip_file_path):
@@ -919,9 +920,23 @@ class ClipperPipeline:
 
             saved_clip_path = await asyncio.to_thread(cut_single_clip)
 
+            # Generate thumbnail for clip
+            thumb_filename = f"{safe_title}_clip_{idx:02d}_thumb.jpg"
+            thumb_file_path = str(clips_dir / thumb_filename)
+            mid_pt = (window.start_time + window.end_time) / 2.0
+            def make_thumb(t=mid_pt, out_t=thumb_file_path):
+                if hasattr(self.clip_generator, "_generate_thumbnail"):
+                    try:
+                        return self.clip_generator._generate_thumbnail(video_path_str, t, out_t)
+                    except Exception:
+                        pass
+                return None
+            saved_thumb = await asyncio.to_thread(make_thumb)
+
             clip_dict = window.to_dict()
             clip_dict["clip_id"] = idx
             clip_dict["clip_path"] = saved_clip_path
+            clip_dict["thumbnail_path"] = saved_thumb if (saved_thumb and Path(saved_thumb).exists()) else None
             clip_results.append(clip_dict)
 
             pct = 80.0 + (idx / max(1, total_clips)) * 15.0
@@ -993,30 +1008,57 @@ class ClipperPipeline:
         }
 
     async def _download_video(self, url: str) -> Tuple[str, str]:
-        """Download video from URL using yt-dlp or direct stream download."""
+        """Download video from URL using yt-dlp with speed and format optimizations."""
         download_dir = self.output_dir / "downloads"
         download_dir.mkdir(parents=True, exist_ok=True)
 
         try:
             import yt_dlp  # type: ignore
+
+            # Fast 720p download settings for optimal processing speed
             ydl_opts = {
-                'outtmpl': str(download_dir / '%(title)s.%(ext)s'),
-                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                'outtmpl': str(download_dir / '%(id)s.%(ext)s'),
+                'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best',
+                'merge_output_format': 'mp4',
+                'windowsfilenames': True,
+                'noplaylist': True,
                 'quiet': True,
                 'no_warnings': True,
             }
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                filename = ydl.prepare_filename(info)
-                title = info.get('title', 'downloaded_video')
-                return str(filename), str(title)
-        except Exception as e:
-            logger.debug(f"yt-dlp download failed or not installed: {e}")
 
-        import urllib.request
-        filename = download_dir / "downloaded_video.mp4"
-        await asyncio.to_thread(urllib.request.urlretrieve, url, str(filename))
-        return str(filename), "downloaded_video"
+            def _dl():
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                    if info and "entries" in info and info["entries"]:
+                        info = info["entries"][0]
+                    title = info.get('title', 'downloaded_video') if info else 'downloaded_video'
+                    base_name = ydl.prepare_filename(info) if info else str(download_dir / "video.mp4")
+
+                    # Check for mp4 or downloaded file
+                    p_mp4 = Path(base_name).with_suffix(".mp4")
+                    if p_mp4.exists() and p_mp4.stat().st_size > 0:
+                        return str(p_mp4), str(title)
+                    if Path(base_name).exists() and Path(base_name).stat().st_size > 0:
+                        return str(base_name), str(title)
+
+                    # Look for matching file in download_dir
+                    video_id = info.get('id', '') if info else ''
+                    if video_id:
+                        matches = list(download_dir.glob(f"{video_id}*"))
+                        if matches:
+                            return str(matches[0]), str(title)
+
+                    # Fallback to most recent file in download_dir
+                    all_files = sorted(download_dir.glob("*.*"), key=lambda f: f.stat().st_mtime, reverse=True)
+                    if all_files:
+                        return str(all_files[0]), str(title)
+
+                    return str(base_name), str(title)
+
+            return await asyncio.to_thread(_dl)
+        except Exception as e:
+            logger.error(f"yt-dlp download failed: {e}")
+            raise RuntimeError(f"Failed to acquire video stream from URL: {e}")
 
     def _get_video_duration(self, video_path: str) -> float:
         """Inspect video file to determine its duration in seconds."""

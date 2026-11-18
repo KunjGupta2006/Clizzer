@@ -332,7 +332,8 @@ class VisualAnalyzer:
                 if not ret:
                     break
                 curr_time = frame_idx / fps
-                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                small = cv2.resize(frame, (160, 90))
+                gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
 
                 if prev_gray is not None:
                     diff = cv2.absdiff(prev_gray, gray)
