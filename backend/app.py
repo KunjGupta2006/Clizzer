@@ -5,6 +5,7 @@ Main Gradio Blocks application mounted on FastAPI with custom GTA Vice City aest
 
 import os
 import sys
+import re
 import time
 import queue
 import zipfile
@@ -440,6 +441,59 @@ def download_all_clips(clip1: Optional[str], clip2: Optional[str], clip3: Option
     return gr.update(value=zip_path, visible=True)
 
 
+def update_source_preview(url: Optional[str], file: Optional[Any]) -> str:
+    """Generate reactive GTA Vice City live preview embed HTML for YouTube or uploaded videos."""
+    # 1. File Upload preview
+    if file is not None:
+        file_path = file if isinstance(file, str) else getattr(file, "name", str(file))
+        file_name = os.path.basename(file_path)
+        return f"""
+        <div style="max-width: 720px; margin: 10px auto; background: #1a1a2e; border: 2px solid #ff007f; border-radius: 10px; padding: 14px; box-shadow: 0 0 20px rgba(255, 0, 127, 0.45); text-align: center;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,0,127,0.3); padding-bottom: 6px; margin-bottom: 10px;">
+                <span style="color: #f5b800; font-weight: 800; font-size: 1.1rem; letter-spacing: 1.5px; font-family: 'Big Shoulders Display', sans-serif;">📁 LOCAL SURVEILLANCE TAPE LOADED</span>
+                <span style="color: #00f0ff; font-weight: 700; font-size: 0.85rem; letter-spacing: 1px;">LOCAL FILE</span>
+            </div>
+            <p style="color: #ffffff; font-size: 1.2rem; font-weight: 700; margin: 8px 0; font-family: 'Montserrat', sans-serif;">{file_name}</p>
+            <p style="color: #00f0ff; font-size: 0.95rem; margin: 0;">Tape ready for AI hype scanning. Adjust sliders & hit START MISSION.</p>
+        </div>
+        """
+
+    # 2. YouTube URL preview
+    if url and url.strip():
+        u = url.strip()
+        yt_match = re.search(r'(?:v=|\/|youtu\.be\/|embed\/)([0-9A-Za-z_-]{11})', u)
+        if yt_match:
+            yt_id = yt_match.group(1)
+            return f"""
+            <div style="max-width: 720px; margin: 10px auto; background: #1a1a2e; border: 2px solid #00f0ff; border-radius: 10px; overflow: hidden; box-shadow: 0 0 25px rgba(0, 240, 255, 0.45); padding: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 6px 8px 6px; border-bottom: 1px solid rgba(0,240,255,0.3); margin-bottom: 8px;">
+                    <span style="color: #f5b800; font-weight: 800; font-size: 1.15rem; letter-spacing: 1.5px; font-family: 'Big Shoulders Display', sans-serif;">📡 RADAR TARGET ACQUIRED • LIVE FEED</span>
+                    <span style="color: #ff007f; font-weight: 700; font-size: 0.85rem; letter-spacing: 1px;">YOUTUBE ({yt_id})</span>
+                </div>
+                <div style="position: relative; width: 100%; padding-bottom: 56.25%; height: 0;">
+                    <iframe style="position: absolute; top:0; left: 0; width: 100%; height: 100%; border: none; border-radius: 6px;" src="https://www.youtube-nocookie.com/embed/{yt_id}" title="Source Video Preview" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                </div>
+            </div>
+            """
+        else:
+            return f"""
+            <div style="max-width: 720px; margin: 10px auto; background: #1a1a2e; border: 2px solid #f5b800; border-radius: 10px; padding: 14px; box-shadow: 0 0 15px rgba(245, 184, 0, 0.35); text-align: center;">
+                <p style="color: #f5b800; font-size: 1.15rem; font-weight: 800; letter-spacing: 1.5px; margin: 0 0 6px 0; font-family: 'Big Shoulders Display', sans-serif;">🌐 WEB STREAM DETECTED</p>
+                <p style="color: #ffffff; font-size: 0.95rem; margin: 0; word-break: break-all;">{u}</p>
+                <p style="color: #00f0ff; font-size: 0.9rem; margin-top: 6px;">URL verified for AI ingest. Press START MISSION to cut highlights.</p>
+            </div>
+            """
+
+    # 3. Default standby placeholder
+    return """
+    <div style="max-width: 720px; margin: 10px auto; background: rgba(26, 26, 46, 0.6); border: 1.5px dashed rgba(255, 0, 127, 0.45); border-radius: 10px; padding: 18px; text-align: center;">
+        <p style="color: #00f0ff; font-size: 1.15rem; font-weight: 800; letter-spacing: 2px; margin: 0; font-family: 'Big Shoulders Display', sans-serif;">
+            🎯 RADAR SCANNER STANDBY • PASTE A LINK ABOVE TO ENGAGE LIVE PREVIEW
+        </p>
+    </div>
+    """
+
+
 # ==============================================================================
 # GRADIO BLOCKS APPLICATION
 # ==============================================================================
@@ -476,6 +530,12 @@ with gr.Blocks(theme=vice_city_theme, css=CUSTOM_CSS, title="CLIZZER - Vice City
             scale=2,
             elem_id="file-input",
         )
+
+    # Live Source Radar Preview
+    preview_box = gr.HTML(
+        value=update_source_preview(None, None),
+        elem_id="live-source-preview",
+    )
 
     # Configuration Row: num_clips and max_duration sliders
     with gr.Row():
@@ -535,6 +595,18 @@ with gr.Blocks(theme=vice_city_theme, css=CUSTOM_CSS, title="CLIZZER - Vice City
     )
 
     # Event Handlers
+    url_input.change(
+        fn=update_source_preview,
+        inputs=[url_input, file_input],
+        outputs=[preview_box],
+    )
+
+    file_input.change(
+        fn=update_source_preview,
+        inputs=[url_input, file_input],
+        outputs=[preview_box],
+    )
+
     start_btn.click(
         fn=process_clizzer_mission,
         inputs=[url_input, file_input, num_clips_slider, max_duration_slider],

@@ -1023,25 +1023,59 @@ class ClipperPipeline:
         }
 
     async def _download_video(self, url: str) -> Tuple[str, str]:
-        """Download video from URL using yt-dlp with speed and format optimizations."""
+        """Download video from URL using yt-dlp with anti-bot bypass and format optimizations."""
         download_dir = self.output_dir / "downloads"
         download_dir.mkdir(parents=True, exist_ok=True)
 
         try:
             import yt_dlp  # type: ignore
 
-            # Fast 720p download settings for optimal processing speed
-            ydl_opts = {
-                'outtmpl': str(download_dir / '%(id)s.%(ext)s'),
-                'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best',
-                'merge_output_format': 'mp4',
-                'windowsfilenames': True,
-                'noplaylist': True,
-                'quiet': True,
-                'no_warnings': True,
-            }
+            # Auto-detect any exported cookie file to support private or gated streams
+            cookie_file = None
+            cookie_candidates = [
+                Path("cookies.txt"),
+                Path("youtube_cookies.txt"),
+                Path("/content/cookies.txt"),
+                self.output_dir / "cookies.txt",
+                Path(__file__).resolve().parent.parent / "cookies.txt",
+            ]
+            for cp in cookie_candidates:
+                if cp.exists() and cp.is_file() and cp.stat().st_size > 0:
+                    cookie_file = str(cp.resolve())
+                    break
 
-            def _dl():
+            # Fallback client strategies: android and ios clients bypass datacenter IP bot gates
+            client_strategies = [
+                ['android', 'ios'],
+                ['android'],
+                ['ios', 'mweb'],
+                ['web_embedded', 'mweb'],
+                ['web', 'mweb'],
+            ]
+
+            def _attempt_dl(clients: list):
+                ydl_opts = {
+                    'outtmpl': str(download_dir / '%(id)s.%(ext)s'),
+                    'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best',
+                    'merge_output_format': 'mp4',
+                    'windowsfilenames': True,
+                    'noplaylist': True,
+                    'quiet': True,
+                    'no_warnings': True,
+                    'extractor_args': {
+                        'youtube': {
+                            'player_client': clients,
+                            'player_skip': ['webpage', 'configs'],
+                        }
+                    },
+                    'http_headers': {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                    }
+                }
+                if cookie_file:
+                    ydl_opts['cookiefile'] = cookie_file
+
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=True)
                     if info and "entries" in info and info["entries"]:
@@ -1070,7 +1104,19 @@ class ClipperPipeline:
 
                     return str(base_name), str(title)
 
-            return await asyncio.to_thread(_dl)
+            def _dl_with_retry():
+                last_err = None
+                for clients in client_strategies:
+                    try:
+                        return _attempt_dl(clients)
+                    except Exception as err:
+                        last_err = err
+                        logger.warning("yt-dlp attempt with clients %s failed: %s; retrying next client...", clients, err)
+                if last_err:
+                    raise last_err
+                raise RuntimeError("Failed to download video stream with all available client strategies.")
+
+            return await asyncio.to_thread(_dl_with_retry)
         except Exception as e:
             logger.error(f"yt-dlp download failed: {e}")
             raise RuntimeError(f"Failed to acquire video stream from URL: {e}")
