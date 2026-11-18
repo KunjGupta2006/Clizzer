@@ -553,7 +553,7 @@ class HypeEngine:
 
         # Case 1: Dictionary format
         if isinstance(data, dict):
-            # Special check for visual_analyzer.py motion_timeline: [{"timestamp": t, "motion_magnitude": v}, ...]
+            # Check for visual_analyzer motion_timeline: [{"timestamp": t, "motion_magnitude": v}, ...]
             if "motion_timeline" in data and isinstance(data["motion_timeline"], list):
                 mt_times = []
                 mt_vals = []
@@ -564,20 +564,54 @@ class HypeEngine:
                 if mt_times:
                     return np.asarray(mt_times, dtype=float), np.asarray(mt_vals, dtype=float)
 
+            # Check for face_analyzer emotion_timeline: [{"timestamp": t, "intensity": v}, ...]
+            if "emotion_timeline" in data and isinstance(data["emotion_timeline"], list):
+                em_times = []
+                em_vals = []
+                for item in data["emotion_timeline"]:
+                    if isinstance(item, dict):
+                        em_times.append(float(item.get("timestamp", 0.0)))
+                        val = item.get("intensity", item.get("emotion_intensity", item.get("smile_ratio", item.get("score", 0.5))))
+                        em_vals.append(float(val))
+                if em_times:
+                    return np.asarray(em_times, dtype=float), np.asarray(em_vals, dtype=float)
+
+            # Check for face_frames or primary_face_track
+            for track_k in ("primary_face_track", "face_frames"):
+                if track_k in data and isinstance(data[track_k], list):
+                    fc_times = []
+                    fc_vals = []
+                    for item in data[track_k]:
+                        if hasattr(item, "timestamp"):
+                            fc_times.append(float(item.timestamp))
+                            conf = getattr(item, "confidence", getattr(item, "smile_ratio", 0.5))
+                            fc_vals.append(float(conf))
+                        elif isinstance(item, dict):
+                            fc_times.append(float(item.get("timestamp", 0.0)))
+                            fc_vals.append(float(item.get("confidence", item.get("smile_ratio", item.get("score", 0.5)))))
+                    if fc_times:
+                        return np.asarray(fc_times, dtype=float), np.asarray(fc_vals, dtype=float)
+
             times = None
             values = None
 
             # Look for time keys
             for tk in ("timestamps", "times", "time", "t", "timestamp"):
                 if tk in data and data[tk] is not None:
-                    times = np.asarray(data[tk], dtype=float)
-                    break
+                    try:
+                        times = np.asarray(data[tk], dtype=float)
+                        break
+                    except (ValueError, TypeError):
+                        pass
 
             # Look for value keys
             for vk in candidate_keys + ("scores", "values", "score", "value", "data"):
                 if vk in data and data[vk] is not None:
-                    values = np.asarray(data[vk], dtype=float)
-                    break
+                    try:
+                        values = np.asarray(data[vk], dtype=float)
+                        break
+                    except (ValueError, TypeError):
+                        pass
 
             # Handle segment lists inside dictionary
             if values is None and "segments" in data and isinstance(data["segments"], list):
@@ -595,10 +629,13 @@ class HypeEngine:
                 if seg_times:
                     return np.asarray(seg_times, dtype=float), np.asarray(seg_vals, dtype=float)
 
-            if values is not None:
-                if times is None:
+            if values is not None and len(values) > 0:
+                if times is None or len(times) != len(values):
                     times = np.linspace(0.0, max(duration, 1.0), len(values))
                 return times, values
+
+            # If dict was provided but no valid timeline extracted, return empty safely
+            return np.array([], dtype=float), np.array([], dtype=float)
 
         # Case 2: List of segment dicts e.g. [{"start": 0, "end": 2, "score": 0.8}, ...]
         if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):

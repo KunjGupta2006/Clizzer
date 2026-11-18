@@ -14,6 +14,9 @@ from __future__ import annotations
 
 import os
 import sys
+import re
+import shutil
+import subprocess
 import time
 import asyncio
 import inspect
@@ -40,6 +43,11 @@ except (ImportError, ValueError):
     VisualAnalyzer = None  # type: ignore
 
 try:
+    from .face_analyzer import FaceAnalyzer
+except (ImportError, ValueError):
+    FaceAnalyzer = None  # type: ignore
+
+try:
     from .transcriber import Transcriber
 except (ImportError, ValueError):
     Transcriber = None  # type: ignore
@@ -59,14 +67,17 @@ try:
 except (ImportError, ValueError):
     SubtitleGenerator = None  # type: ignore
 
-# Audio extraction helper from backend/utils/helpers.py
+# Audio extraction helper from utils/helpers.py
 try:
-    from ..utils.helpers import extract_audio
+    from utils.helpers import extract_audio
 except (ImportError, ValueError, ModuleNotFoundError):
     try:
-        from backend.utils.helpers import extract_audio
-    except (ImportError, ModuleNotFoundError):
-        extract_audio = None
+        from ..utils.helpers import extract_audio
+    except (ImportError, ValueError, ModuleNotFoundError):
+        try:
+            from backend.utils.helpers import extract_audio
+        except (ImportError, ModuleNotFoundError):
+            extract_audio = None
 
 logger = logging.getLogger(__name__)
 
@@ -371,6 +382,9 @@ class DefaultClipGenerator:
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.config = config or {}
 
+    def _cut_clip(self, video_path: str, start: float, end: float, output_path: str, **kwargs: Any) -> str:
+        return self.generate_clip(video_path, start, end, output_path)
+
     def generate_clip(self, video_path: str, start_time: float, end_time: float, output_path: str) -> str:
         out_p = Path(output_path).resolve()
         out_p.parent.mkdir(parents=True, exist_ok=True)
@@ -540,6 +554,7 @@ class ClipperPipeline:
         # 3. Face Analyzer
         self._face_analyzer_cls = (
             self.config.get("face_analyzer_class")
+            or FaceAnalyzer
             or DefaultFaceAnalyzer
         )
 
@@ -1063,10 +1078,18 @@ class ClipperPipeline:
     def _get_video_duration(self, video_path: str) -> float:
         """Inspect video file to determine its duration in seconds."""
         try:
-            from ..utils.helpers import get_video_duration
+            from utils.helpers import get_video_duration
             return float(get_video_duration(video_path))
         except Exception:
-            pass
+            try:
+                from ..utils.helpers import get_video_duration
+                return float(get_video_duration(video_path))
+            except Exception:
+                try:
+                    from backend.utils.helpers import get_video_duration
+                    return float(get_video_duration(video_path))
+                except Exception:
+                    pass
 
         try:
             import cv2

@@ -199,6 +199,26 @@ class ClipGenerator:
 
         return results
 
+    def generate_clip(
+        self,
+        video_path: str | Path,
+        start: float,
+        end: float,
+        output_path: str | Path,
+        reframe: bool = False,
+        face_center: Any = None,
+        **kwargs: Any,
+    ) -> str:
+        """Alias to _cut_clip for interface consistency."""
+        return self._cut_clip(
+            video_path=video_path,
+            start=start,
+            end=end,
+            output_path=output_path,
+            reframe=reframe,
+            face_center=face_center,
+        )
+
     def _cut_clip(
         self,
         video_path: str | Path,

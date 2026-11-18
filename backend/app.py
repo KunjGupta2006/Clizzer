@@ -13,10 +13,15 @@ import tempfile
 import threading
 from typing import Optional, List, Any
 
-# Ensure backend root is on sys.path for direct executions
+# Ensure backend root and workspace root are on sys.path for direct executions
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-if CURRENT_DIR not in sys.path:
-    sys.path.insert(0, CURRENT_DIR)
+PARENT_DIR = os.path.dirname(CURRENT_DIR)
+for p in [CURRENT_DIR, PARENT_DIR]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+import logging
+logger = logging.getLogger("clizzer.app")
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,35 +32,12 @@ import gradio as gr
 # Import ClipperPipeline from core.pipeline
 try:
     from core.pipeline import ClipperPipeline
-except ImportError:
-    # Graceful fallback placeholder until core.pipeline is fully defined
-    class ClipperPipeline:
-        """Fallback mock ClipperPipeline when core.pipeline is not yet available."""
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def process(
-            self,
-            input_source: str,
-            num_clips: int = 4,
-            max_duration: int = 30,
-            progress_callback=None,
-        ) -> List[str]:
-            stages = [
-                (1, "Acquiring source video stream..."),
-                (2, "Transcribing speech & analyzing audio..."),
-                (3, "Detecting scenes and viral highlights..."),
-                (4, "MediaPipe reframing & smart 9:16 crop..."),
-                (5, "Mission Passed! Final clips rendered."),
-            ]
-            for star, msg in stages:
-                if progress_callback:
-                    progress_callback(star, 5, msg)
-                time.sleep(0.3)
-            return []
-
-        def run(self, *args, **kwargs) -> List[str]:
-            return self.process(*args, **kwargs)
+except ImportError as err1:
+    try:
+        from backend.core.pipeline import ClipperPipeline
+    except ImportError as err2:
+        logger.error("Failed to import ClipperPipeline from core or backend.core: %s / %s", err1, err2, exc_info=True)
+        raise ImportError(f"Failed to import ClipperPipeline: {err1} / {err2}")
 
 
 # ==============================================================================
@@ -389,6 +371,7 @@ def process_clizzer_mission(url: Optional[str], file: Optional[Any], num_clips: 
             )
             execution_state["clips"] = clips or []
         except Exception as exc:
+            logger.error("Clizzer pipeline execution failure: %s", exc, exc_info=True)
             execution_state["error"] = str(exc)
         finally:
             progress_queue.put(("done", None))
