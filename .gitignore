@@ -1,13 +1,10 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
 .Python
+env/
 build/
 develop-eggs/
 dist/
@@ -20,88 +17,36 @@ parts/
 sdist/
 var/
 wheels/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
-
-# Virtual Environments
-venv/
-env/
-ENV/
-.venv/
-env.bak/
-venv.bak/
-
-# Testing & Coverage
-.cache
 .pytest_cache/
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
 .coverage
-.coverage.*
-.tox/
-.nox/
 htmlcov/
+.venv/
+venv/
 
-# Node & Next.js
-node_modules/
-.pnp
-.pnp.js
-.next/
-out/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
+# Environment and secrets
+.env
+*.local
 
-# Clizzer Workspace & Cache Directories
+# Node / Web
+web/node_modules/
+web/.next/
+web/out/
+web/build/
+frontend/node_modules/
+frontend/.next/
+
+# Data and Cache
+data/cache/
+data/jobs/
+data/out/
+data/*.db
+data/*.sqlite
 temp/
 output/
-models_cache/
 
-# Media Files & Video Artifacts
-*.mp4
-*.mkv
-*.avi
-*.webm
-*.mov
-*.flv
-*.wmv
-*.m4v
-*.mp3
-*.wav
-*.aac
-*.flac
-*.ogg
-*.m4a
-*.zip
-*.tar.gz
-
-# Environment & Secret Configurations
-.env
-.env.*
-!.env.example
-*.env
-
-# IDEs & Text Editors
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
-*.swp
-*.swo
-*~
-
-# Operating System Files
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-desktop.ini

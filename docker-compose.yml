@@ -1,44 +1,30 @@
 version: "3.8"
 
 services:
-  backend:
+  api:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
-    container_name: clizzer-backend
-    restart: unless-stopped
     ports:
-      - "7860:7860"
+      - "8000:8000"
     environment:
-      - WHISPER_MODEL=tiny
-      - WHISPER_MODEL_SIZE=tiny
-      - DEVICE=cpu
-      - WHISPER_DEVICE=cpu
-      - WHISPER_COMPUTE_TYPE=int8
-      - TEMP_DIR=temp
-      - OUTPUT_DIR=output
-      - MODELS_DIR=models_cache
+      - LLM_PROVIDER=${LLM_PROVIDER:-groq}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_MODEL=${GROQ_MODEL:-llama-3.3-70b-versatile}
+      - GROQ_RPM=${GROQ_RPM:-20}
+      - HF_TOKEN=${HF_TOKEN}
     volumes:
-      - ./temp:/app/temp
-      - ./output:/app/output
-      - ./models_cache:/app/models_cache
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7860/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: clizzer-frontend
+      - ./data:/app/data
     restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:7860
-      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
-      - backend
+      - api
+    restart: unless-stopped
