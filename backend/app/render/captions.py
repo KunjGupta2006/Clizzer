@@ -83,10 +83,11 @@ def generate_ass(
 ) -> Path:
     clip_words = [w for w in words if clip_start <= w.start <= clip_end]
 
-    # ASS Header with 10% margins and bold viral styling
-    margin_v = int(video_height * 0.12)
-    margin_lr = int(video_width * 0.10)
-    font_size = int(video_width * 0.055)  # ~60px on 1080p
+    # ASS Header with viral, high-retention TikTok/Reels styling
+    # Placed safely in lower-third (MarginV=22% height), bold Arial Black font, high-contrast black outline
+    margin_v = int(video_height * 0.22)
+    margin_lr = int(video_width * 0.08)
+    font_size = int(video_width * 0.065)  # ~70px on 1080p
 
     header = f"""[Script Info]
 ScriptType: v4.00+
@@ -96,8 +97,8 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,{font_size},&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,2,2,{margin_lr},{margin_lr},{margin_v},1
-Style: Credit,Arial,{int(font_size * 0.55)},&H00CCCCCC,&H00000000,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,8,{margin_lr},{margin_lr},40,1
+Style: Default,Arial Black,{font_size},&H00FFFFFF,&H0000E6FF,&H00000000,&H90000000,-1,0,0,0,100,100,1,0,1,5,3,2,{margin_lr},{margin_lr},{margin_v},1
+Style: Credit,Arial Black,{int(font_size * 0.50)},&H00CCCCCC,&H00000000,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,8,{margin_lr},{margin_lr},50,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -110,14 +111,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         duration_ass = format_timestamp_ass(clip_end - clip_start)
         events.append(f"Dialogue: 0,0:00:00.00,{duration_ass},Credit,,0,0,0,,{esc_credit}")
 
-    # Generate word-highlight karaoke dialogue
-    chunk_size = 4
+    # Generate word-highlight viral karaoke dialogue (punchy 2-3 word chunks)
+    chunk_size = 3
     for i in range(0, len(clip_words), chunk_size):
         group = clip_words[i : i + chunk_size]
         g_start = max(0.0, group[0].start - clip_start)
         g_end = max(g_start + 0.3, group[-1].end - clip_start)
 
-        # Build highlighted word dialogue for each active word
+        # Build highlighted word dialogue for each active word with pop-scale emphasis
         for active_idx, target_word in enumerate(group):
             w_start = max(0.0, target_word.start - clip_start)
             w_end = max(w_start + 0.15, target_word.end - clip_start)
@@ -125,10 +126,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             words_rendered = []
             for j, w in enumerate(group):
                 clean_txt = mask_profanity(w.text) if mask_curse else w.text
-                esc_txt = escape_ass(clean_txt)
+                # Convert to punchy uppercase for modern viral look
+                upper_txt = clean_txt.upper()
+                esc_txt = escape_ass(upper_txt)
                 if j == active_idx:
-                    # Highlight color (yellow: &H0000FFFF&)
-                    words_rendered.append(f"{{\\c&H0000FFFF&\\b1}}{esc_txt}{{\\r}}")
+                    # Electric yellow highlight with subtle punch pop
+                    words_rendered.append(f"{{\\c&H0000E6FF&\\b1\\fscx110\\fscy110}}{esc_txt}{{\\r}}")
                 else:
                     words_rendered.append(esc_txt)
 

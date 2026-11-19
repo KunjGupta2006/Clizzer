@@ -61,6 +61,15 @@ def trim_clip(clip_id: str, payload: Dict[str, float]) -> Dict[str, Any]:
 
 @router.get("/{clip_id}/download")
 def download_clip(clip_id: str):
+    # If clip_id is like job_12345_clip_01 or job_12345_clip_01.mp4
+    if "_clip_" in clip_id:
+        parts = clip_id.rsplit("_clip_", 1)
+        job_id = parts[0]
+        clip_name = f"clip_{parts[1].replace('.mp4', '')}.mp4"
+        target = settings.OUT_DIR / job_id / clip_name
+        if target.exists():
+            return FileResponse(path=str(target), media_type="video/mp4", filename=target.name)
+
     matches = list(settings.OUT_DIR.glob(f"**/{clip_id}.mp4"))
     if not matches:
         # Check if clip_id is filename
@@ -68,7 +77,8 @@ def download_clip(clip_id: str):
     if not matches or not matches[0].exists():
         raise HTTPException(status_code=404, detail="Clip video file not found")
 
-    file_path = matches[0]
+    # Prefer the latest rendered clip if multiple match
+    file_path = sorted(matches, key=lambda p: p.stat().st_mtime)[-1]
     return FileResponse(
         path=str(file_path),
         media_type="video/mp4",

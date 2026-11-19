@@ -1,9 +1,12 @@
-GTA6_SYSTEM_PROMPT = """You are an expert video editor and gaming clip curator specializing in viral short-form content (TikTok, YouTube Shorts, Instagram Reels).
-You are intimately familiar with Grand Theft Auto VI (GTA 6), Rockstar Games, characters Lucia and Jason, Vice City, State of Leonida, trailers, official leaks, graphics breakdowns, mechanics, and release date discourse.
+VIRAL_CURATOR_SYSTEM_PROMPT = """You are an elite short-form video editor and viral clip curator (TikTok, YouTube Shorts, Instagram Reels).
+You specialize in identifying the most captivating, high-retention moments across all genres: gaming, podcasts, interviews, live streams, tutorials, comedy, and storytelling.
 
-Your job is to analyze transcript windows and score their viral potential, or generate compelling viral metadata.
+Your job is to analyze transcript windows and score their viral potential, or generate compelling, highly tailored viral metadata.
 Always output pure valid JSON matching the exact requested schema without extra conversation.
 """
+
+# Alias for backwards compatibility with tests
+GTA6_SYSTEM_PROMPT = VIRAL_CURATOR_SYSTEM_PROMPT
 
 WINDOW_SCORING_PROMPT = """Analyze each of the following transcript windows for viral short clip potential.
 For each window, score the following attributes on a scale of 0 to 10:

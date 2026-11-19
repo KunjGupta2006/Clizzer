@@ -45,6 +45,10 @@ def build_reframe_filter(
             center_x = current_x
 
     if aspect == "9:16":
+        # If source is already approximately 9:16 vertical video
+        if abs((source_w / max(1, source_h)) - (9.0 / 16.0)) < 0.05:
+            return f"scale={out_w}:{out_h}"
+
         if has_faces:
             # Crop 9:16 window centered on face
             crop_w = int(source_h * (9.0 / 16.0))

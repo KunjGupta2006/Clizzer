@@ -3,6 +3,7 @@ from pathlib import Path
 import uuid
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 from backend.app.config import settings
 from backend.app.db import get_session
@@ -121,6 +122,15 @@ def get_job_clips(job_id: str, session: Session = Depends(get_session)) -> List[
         except Exception:
             pass
     return clips
+
+
+@router.get("/{job_id}/clips/{clip_name}/download")
+def download_job_clip(job_id: str, clip_name: str):
+    filename = clip_name if clip_name.endswith(".mp4") else f"{clip_name}.mp4"
+    target = settings.OUT_DIR / job_id / filename
+    if not target.exists():
+        raise HTTPException(status_code=404, detail=f"Clip {filename} not found for job {job_id}")
+    return FileResponse(path=str(target), media_type="video/mp4", filename=target.name)
 
 
 @router.get("/{job_id}/curve")

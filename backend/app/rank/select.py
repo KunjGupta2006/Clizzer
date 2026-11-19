@@ -8,7 +8,7 @@ from backend.app.rank.candidates import find_candidate_peaks
 from backend.app.rank.snap import snap_candidate_boundaries
 from backend.app.rank.dedup import deduplicate_candidates
 from backend.app.text.llm import LLMProvider
-from backend.app.text.prompts import GTA6_SYSTEM_PROMPT, CLIP_METADATA_PROMPT
+from backend.app.text.prompts import VIRAL_CURATOR_SYSTEM_PROMPT, CLIP_METADATA_PROMPT
 from backend.app.logging import logger
 
 
@@ -29,11 +29,21 @@ def generate_metadata_for_clips(
     for i, cand in enumerate(candidates):
         # Extract transcript excerpt for candidate
         clip_words = [w for w in words if cand.start <= w.start <= cand.end]
-        transcript_excerpt = " ".join([w.text for w in clip_words]).strip() or "Epic gameplay moment and viral stream reaction."
+        raw_words = [w.text for w in clip_words if w.text.strip()]
+        transcript_excerpt = " ".join(raw_words).strip()
 
-        title = f"GTA 6 Insane Highlight #{i + 1}"
-        hook = "You won't believe what happened next!"
-        hashtags = ["#GTA6", "#Gaming", "#ViceCity", "#ViralClips"]
+        # Dynamic heuristic metadata based on actual clip audio/speech content
+        if raw_words and len(transcript_excerpt) > 10:
+            preview = " ".join(raw_words[:6])
+            clean_preview = preview.strip(" ,.-!?;:")
+            title = f"{clean_preview.capitalize()}..."[:68]
+            hook = f'"{clean_preview}..."'
+            hashtags = ["#Shorts", "#Viral", "#Trending", "#Highlights"]
+        else:
+            title = f"Top Viral Moment #{i + 1}"
+            hook = "Wait for this reaction!"
+            hashtags = ["#ViralShorts", "#Trending", "#Clips", "#Highlights"]
+
         reason = cand.reason
 
         if cand.music_ratio > 0.6:
@@ -41,8 +51,8 @@ def generate_metadata_for_clips(
 
         if provider is not None:
             try:
-                user_prompt = CLIP_METADATA_PROMPT.format(transcript=transcript_excerpt[:500])
-                resp = provider.complete(GTA6_SYSTEM_PROMPT, user_prompt, schema=ClipMetadataOutput)
+                user_prompt = CLIP_METADATA_PROMPT.format(transcript=transcript_excerpt[:500] if transcript_excerpt else "Dynamic high-action gaming or conversation moment")
+                resp = provider.complete(VIRAL_CURATOR_SYSTEM_PROMPT, user_prompt, schema=ClipMetadataOutput)
                 if resp.get("title"):
                     title = resp["title"][:70]
                 if resp.get("hook"):

@@ -17,8 +17,9 @@ export default function ClipCard({ clip, index, jobId, onClipUpdated }: ClipCard
   const [copiedTags, setCopiedTags] = useState(false);
 
   const clipNumStr = String(index + 1).padStart(2, "0");
-  const clipId = `job_${jobId}_clip_${clipNumStr}`;
-  const downloadUrl = getClipDownloadUrl(`clip_${clipNumStr}`);
+  const clipFilename = `clip_${clipNumStr}`;
+  const clipId = `${jobId}_clip_${clipNumStr}`;
+  const downloadUrl = getClipDownloadUrl(clipFilename, jobId);
 
   const copyText = (text: string, setter: (val: boolean) => void) => {
     navigator.clipboard.writeText(text);
@@ -36,13 +37,14 @@ export default function ClipCard({ clip, index, jobId, onClipUpdated }: ClipCard
 
   return (
     <div className="bg-[#14151d] border border-gray-800 rounded-2xl overflow-hidden shadow-xl flex flex-col justify-between">
-      {/* Video Preview */}
-      <div className="relative aspect-[9/16] bg-black max-h-[380px] flex items-center justify-center overflow-hidden group">
+      {/* Video Preview - True 9:16 Vertical Shorts Aspect */}
+      <div className="relative aspect-[9/16] w-full bg-black flex items-center justify-center overflow-hidden group rounded-t-2xl">
         <video
           src={downloadUrl}
           poster={clip.thumb ? `/api/proxy?path=${encodeURIComponent(clip.thumb)}` : undefined}
           controls
-          className="w-full h-full object-contain"
+          playsInline
+          className="w-full h-full object-cover"
         />
 
         {/* Score Badge */}

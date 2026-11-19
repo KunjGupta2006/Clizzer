@@ -16,19 +16,32 @@ def find_candidate_peaks(
     if len(fused_series) == 0:
         return []
 
+    series_for_peaks = np.array(fused_series, copy=True)
+    n = len(series_for_peaks)
+    # If the video is longer than 45s, gently attenuate the first 12s (intro logo/sting)
+    # and the last 10s (outro/end-screen subscribe cards) to favor true content peaks
+    if duration > 45.0 and n > 45:
+        intro_len = min(12, int(n * 0.06))
+        for i in range(intro_len):
+            series_for_peaks[i] *= (0.3 + 0.7 * (i / max(1, intro_len)))
+        outro_len = min(10, int(n * 0.05))
+        for i in range(outro_len):
+            idx = n - 1 - i
+            series_for_peaks[idx] *= (0.3 + 0.7 * (i / max(1, outro_len)))
+
     # Detect peaks
     peaks, properties = find_peaks(
-        fused_series,
+        series_for_peaks,
         prominence=prominence,
         distance=distance_sec,
     )
 
     # If no prominent peaks found, fall back to top local maxima
     if len(peaks) == 0:
-        peaks, _ = find_peaks(fused_series, distance=distance_sec)
+        peaks, _ = find_peaks(series_for_peaks, distance=distance_sec)
         if len(peaks) == 0:
             # Fall back to argmax
-            peaks = np.array([int(np.argmax(fused_series))])
+            peaks = np.array([int(np.argmax(series_for_peaks))])
 
     arrays = bundle.to_arrays() if bundle else {}
     candidates: List[Candidate] = []
