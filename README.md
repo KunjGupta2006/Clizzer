@@ -13,23 +13,177 @@ Rendered outputs feature smart face-centered vertical reframing, word-highlight 
 
 ---
 
-## ⚡ Quick Start: How to Start the Project
+## 💻 Is My Machine Supported? (No GPU Required!)
 
-You can run Clizzer either using **Docker Compose** (recommended, runs everything in one command) or as a **Local Development** setup.
+> [!NOTE]
+> **YES! Your machine is 100% supported even if you do not have a dedicated GPU (e.g. no NVIDIA graphics card).**
+> Clizzer was engineered from day one with a **CPU-first, zero-GPU fallback architecture**.
 
-### Option A: One-Command Start with Docker Compose (Recommended)
+### How Clizzer Runs on a Standard CPU Machine:
+- **Speech Transcription (ASR)**: Uses `faster-whisper` quantized to `int8` on CPU. It runs smoothly on modern dual-core or quad-core Intel/AMD CPUs.
+- **Video Rendering & Subtitles**: FFmpeg automatically detects whether an NVIDIA GPU is present. When no GPU is found, it automatically uses CPU-accelerated `libx264` (`-preset veryfast -crf 19`), which is universally compatible with every machine.
+- **Face Tracking & Computer Vision**: InsightFace, MediaPipe FaceMesh, and PySceneDetect run natively using the CPU execution provider in ONNX Runtime.
+- **LLM Reasoning & Viral Hooks**: Uses the **Groq Cloud API** (free tier at [console.groq.com](https://console.groq.com)), meaning large 70B models run on Groq's high-speed cloud chips rather than consuming your local RAM/GPU. If no internet or API key is available, it gracefully falls back to built-in heuristic scoring.
+- **Audio Analysis**: Librosa energy, flux, and pitch extraction run purely in NumPy/SciPy on CPU.
 
-Make sure you have [Docker](https://www.docker.com/) and Docker Compose installed.
+### Minimum vs. Recommended Hardware Specs:
+| Component | Minimum (No GPU) | Recommended (With GPU) |
+| :--- | :--- | :--- |
+| **Processor** | 4-core Intel Core i5 / AMD Ryzen 5 or Apple M1/M2/M3 | 8-core CPU or Apple Silicon |
+| **RAM** | 8 GB RAM | 16 GB+ RAM |
+| **GPU** | **None (Pure CPU Mode)** | NVIDIA GPU (RTX 2060+ with 6GB+ VRAM) |
+| **Storage** | 5 GB free disk space | 20 GB free disk space (for large video caches) |
+| **OS** | Windows 10/11, macOS 12+, or Linux (Ubuntu 20.04+) | Windows 10/11 or Ubuntu 22.04+ |
 
-```bash
-# 1. Clone the repository
+---
+
+## 📦 Step-by-Step Installation Guides
+
+Choose the guide matching your operating system:
+
+<details open>
+<summary><b>🪟 Windows Installation Guide (10 / 11)</b></summary>
+
+### 1. Install System Dependencies
+
+Open **PowerShell** as Administrator or use your favorite package manager:
+
+#### Using Windows Package Manager (`winget` - Built into Windows 11 & 10):
+```powershell
+# Install Python 3.11
+winget install Python.Python.3.11
+
+# Install Node.js (LTS version 20)
+winget install OpenJS.NodeJS.LTS
+
+# Install FFmpeg (essential for video processing)
+winget install Gyan.FFmpeg
+
+# Install Git
+winget install Git.Git
+```
+*Note: After installing with `winget`, close and reopen your PowerShell terminal so your `PATH` updates.*
+
+#### Or install manually:
+- [Python 3.11 Windows Installer](https://www.python.org/downloads/release/python-3119/) (⚠️ **Crucial**: Check the box **"Add python.exe to PATH"** during installation).
+- [Node.js LTS Installer](https://nodejs.org/).
+- [FFmpeg Windows Builds](https://www.gyan.dev/ffmpeg/builds/) (Extract and add the `bin/` folder to your System Environment `PATH`).
+
+#### Verify installations:
+```powershell
+python --version   # Should show Python 3.11.x or 3.12.x
+node --version     # Should show v18.x or v20.x
+npm --version      # Should show 9.x or 10.x
+ffmpeg -version    # Should print FFmpeg version info
+```
+
+### 2. Install `uv` (Ultra-fast Python Package Manager)
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+*(Alternatively, you can just use `pip install uv`).*
+
+### 3. Clone Repository & Install Dependencies
+```powershell
+# Clone the repository
 git clone https://github.com/your-org/clizzer.git
 cd clizzer
 
-# 2. Copy the environment file (defaults work out of the box with zero keys)
+# Install Python backend dependencies in virtual environment
+uv sync
+
+# Or with standard pip:
+# python -m venv .venv
+# .venv\Scripts\activate
+# pip install -e .
+
+# Install Frontend dependencies
+cd web
+npm install
+cd ..
+```
+</details>
+
+<details>
+<summary><b>🍎 macOS Installation Guide (Apple Silicon M1/M2/M3 & Intel)</b></summary>
+
+### 1. Install Dependencies with Homebrew
+
+If you don't have Homebrew installed, install it from [brew.sh](https://brew.sh):
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Install Python, Node.js, and FFmpeg:
+```bash
+brew install python@3.11 node ffmpeg git uv
+```
+
+Verify your installation:
+```bash
+python3 --version
+node -v
+ffmpeg -version
+```
+
+### 2. Clone Repository & Install Dependencies
+```bash
+git clone https://github.com/your-org/clizzer.git
+cd clizzer
+
+# Install Python backend dependencies
+uv sync
+
+# Install Frontend dependencies
+cd web
+npm install
+cd ..
+```
+</details>
+
+<details>
+<summary><b>🐧 Linux Installation Guide (Ubuntu / Debian / Mint)</b></summary>
+
+### 1. Install System Packages
+```bash
+sudo apt update
+sudo apt install -y python3.11 python3.11-venv python3-pip nodejs npm ffmpeg git curl
+
+# Install uv (recommended for ultra-fast builds)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env
+```
+
+### 2. Clone Repository & Install Dependencies
+```bash
+git clone https://github.com/your-org/clizzer.git
+cd clizzer
+
+# Install Python backend dependencies
+uv sync
+
+# Install Frontend dependencies
+cd web
+npm install
+cd ..
+```
+</details>
+
+---
+
+## ⚡ Quick Start: How to Start the Project
+
+Once the installation above is complete, you can launch Clizzer in **two ways**:
+
+### Option A: One-Command Start with Docker Compose (Recommended)
+
+If you have [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed:
+
+```bash
+# 1. Copy the environment file (defaults work out of the box with zero keys)
 cp .env.example .env
 
-# 3. Build and launch all services (API + Web Frontend)
+# 2. Build and launch all services (API + Web Frontend)
 docker compose up --build
 ```
 
@@ -49,43 +203,32 @@ docker compose down
 
 ---
 
-### Option B: Local Development Setup
+### Option B: Local Development Setup (Two Terminal Windows)
 
-#### 1. Prerequisites
-- **Python**: 3.11 or 3.12 (with `uv` recommended, or standard `venv`/`pip`)
-- **Node.js**: 18+ or 20+ (with `npm`)
-- **FFmpeg & FFprobe**: Installed and available in PATH
-
-#### 2. Start the Backend API (FastAPI)
-
+#### Terminal 1: Launch Backend API (FastAPI)
 ```bash
-# In the repository root:
-# Install dependencies with uv (or: pip install -e .)
-uv sync
-
-# Copy environment variables template
+# In the project root directory:
 cp .env.example .env
 
-# Start FastAPI server on port 8000 with hot-reload
+# Start FastAPI server on port 8000 with hot-reload:
 uv run uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# (Or if using standard virtual environment:)
+# .venv\Scripts\activate   # Windows
+# source .venv/bin/activate # Mac/Linux
+# uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-#### 3. Start the Frontend (Next.js 14)
-
-Open a **second terminal window**:
-
+#### Terminal 2: Launch Frontend Dashboard (Next.js)
 ```bash
-# Navigate to the frontend directory
+# In the project root directory:
 cd web
 
-# Install npm dependencies
-npm install
-
-# Start Next.js development server on port 3000
+# Start Next.js development server on port 3000:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your web browser!
 
 ---
 
@@ -207,24 +350,6 @@ curl http://localhost:8000/jobs/e4c2b9a1-8d2b-426b-95af-1b8389a9f2ce
 curl http://localhost:8000/jobs/e4c2b9a1-8d2b-426b-95af-1b8389a9f2ce/clips
 ```
 
-**Response**:
-```json
-[
-  {
-    "id": "clip_01",
-    "job_id": "e4c2b9a1-8d2b-426b-95af-1b8389a9f2ce",
-    "title": "INSANE 5-Star Police Chase Stunt!",
-    "hook": "You won't believe how this car jump landed!",
-    "hashtags": ["#GTA6", "#Gaming", "#InsaneMoments", "#Clips"],
-    "start": 45.2,
-    "end": 75.8,
-    "fused_score": 2.84,
-    "file": "data/jobs/e4c2b9a1-8d2b-426b-95af-1b8389a9f2ce/clip_01.mp4",
-    "srt": "data/jobs/e4c2b9a1-8d2b-426b-95af-1b8389a9f2ce/clip_01.srt"
-  }
-]
-```
-
 #### 5. Download Clip File Directly
 
 ```bash
@@ -280,26 +405,6 @@ If you prefer running a local LLM without cloud services:
    OLLAMA_HOST=http://localhost:11434
    OLLAMA_MODEL=llama3.2
    ```
-
----
-
-## 🖥️ CPU vs. GPU Hardware Acceleration
-
-Clizzer automatically probes and adapts to available compute:
-
-- **CUDA GPU Available**:
-  - `faster-whisper` runs using `float16` on CUDA.
-  - FFmpeg attempts hardware acceleration via `h264_nvenc`.
-  - Torch models (AST audio events, OpenCLIP visual embeddings) utilize GPU VRAM with memory cleanup after each phase.
-- **CPU Only**:
-  - `faster-whisper` runs using quantized `int8` on CPU.
-  - FFmpeg automatically falls back to `libx264 -crf 19 -preset veryfast`.
-  - Multiprocessing threads optimize for CPU core counts.
-
-To force CPU execution even when a GPU is attached, set:
-```env
-CUDA_VISIBLE_DEVICES=""
-```
 
 ---
 
