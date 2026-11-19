@@ -1,6 +1,9 @@
 from pathlib import Path
 from typing import List, Optional, Tuple
-import cv2
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 import numpy as np
 from backend.app.logging import logger
 
@@ -51,7 +54,7 @@ def classify_proxy_frames(
     action_prob = np.zeros(length, dtype=np.float32)
     trailer_prob = np.zeros(length, dtype=np.float32)
 
-    if not proxy_path.exists():
+    if cv2 is None or not proxy_path.exists():
         return action_prob, trailer_prob, False
 
     model, preprocess, tokenizer = get_clip_model()

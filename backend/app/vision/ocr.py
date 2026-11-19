@@ -1,6 +1,9 @@
 from pathlib import Path
 from typing import List, Optional, Tuple
-import cv2
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 import numpy as np
 from backend.app.vision.scenes import detect_scene_cuts, compute_cut_density
 from backend.app.vision.clipzs import classify_proxy_frames
@@ -31,7 +34,7 @@ def run_ocr_on_proxy(
     length = int(np.ceil(duration))
     ocr_hits = np.zeros(length, dtype=np.float32)
 
-    if not proxy_path.exists() or not keywords:
+    if cv2 is None or not proxy_path.exists() or not keywords:
         return ocr_hits
 
     kw_lower = [k.lower() for k in keywords]

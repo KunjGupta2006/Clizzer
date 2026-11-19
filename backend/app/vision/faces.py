@@ -1,6 +1,9 @@
 from pathlib import Path
 from typing import List, Optional, Tuple
-import cv2
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 import numpy as np
 from backend.app.models import FaceFrame, FaceTrack
 from backend.app.audio.features import rolling_median_mad
@@ -37,7 +40,9 @@ def extract_faces_from_proxy(
     length = int(np.ceil(duration))
     face_score = np.zeros(length, dtype=np.float32)
 
-    if not proxy_path.exists():
+    if cv2 is None or not proxy_path.exists():
+        if cv2 is None:
+            logger.warning("opencv_not_installed", fallback="no_face_tracks")
         return [], face_score, False
 
     cap = cv2.VideoCapture(str(proxy_path))
