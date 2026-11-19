@@ -125,20 +125,17 @@ def render_clip(
     )
 
     has_ass = captions and ass_file.exists()
-    try:
-        ass_str = ass_file.relative_to(Path.cwd()).as_posix()
-    except Exception:
-        ass_str = str(ass_file.resolve()).replace("\\", "/").replace(":", "\\:") if has_ass else ""
+    ass_target = ass_file.name if has_ass else ""
 
     is_complex = ";" in reframe_filter
     if is_complex:
         if has_ass:
-            filter_complex = f"{reframe_filter}[v_ov];[v_ov]subtitles={ass_str}[v_out]"
+            filter_complex = f"{reframe_filter}[v_ov];[v_ov]subtitles={ass_target}[v_out]"
         else:
             filter_complex = f"{reframe_filter}[v_out]"
     else:
         if has_ass:
-            simple_vf = f"{reframe_filter},subtitles={ass_str}"
+            simple_vf = f"{reframe_filter},subtitles={ass_target}"
         else:
             simple_vf = reframe_filter
 
@@ -153,10 +150,14 @@ def render_clip(
     clip_duration = clip.end - clip.start
 
     # Render command with -ss after -i for accurate seeking as per spec
+    # Run with cwd=clip_dir so subtitles file is referenced locally without path/colon escaping issues
+    source_resolved = str(source_path.resolve())
+    clip_filename = clip_file.name
+
     cmd = [
         "ffmpeg",
         "-y",
-        "-i", str(source_path),
+        "-i", source_resolved,
         "-ss", f"{clip.start:.3f}",
         "-t", f"{clip_duration:.3f}",
     ]
@@ -170,7 +171,7 @@ def render_clip(
             *enc_args,
             "-c:a", "aac",
             "-b:a", "192k",
-            str(clip_file),
+            clip_filename,
         ])
     else:
         cmd.extend([
@@ -179,10 +180,10 @@ def render_clip(
             *enc_args,
             "-c:a", "aac",
             "-b:a", "192k",
-            str(clip_file),
+            clip_filename,
         ])
 
-    proc = run_ffmpeg(cmd, timeout=180.0)
+    proc = run_ffmpeg(cmd, timeout=180.0, cwd=clip_dir)
     if proc.returncode != 0 or not clip_file.exists() or clip_file.stat().st_size == 0:
         logger.error("render_failed_stderr", stderr=proc.stderr)
         raise RenderFailed(f"Failed to render clip {clip_idx} to {clip_file}")

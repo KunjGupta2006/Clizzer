@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from backend.app.errors import SourceUnavailable
 from backend.app.logging import logger
 
@@ -19,6 +19,7 @@ def run_ffmpeg(
     args: list[str],
     timeout: float = 60.0,
     suppress_error_log: bool = False,
+    cwd: Optional[Path | str] = None,
 ) -> subprocess.CompletedProcess:
     logger.debug("executing_ffmpeg", args=args)
     try:
@@ -29,6 +30,7 @@ def run_ffmpeg(
             text=True,
             timeout=timeout,
             shell=False,
+            cwd=str(cwd) if cwd else None,
         )
         if proc.returncode != 0 and not suppress_error_log:
             logger.error("ffmpeg_failed", stderr=proc.stderr, returncode=proc.returncode)
