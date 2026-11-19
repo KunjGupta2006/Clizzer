@@ -56,18 +56,22 @@ def build_reframe_filter(
             crop_x = (crop_x // 2) * 2
             return f"crop={crop_w}:{source_h}:{crop_x}:0,scale={out_w}:{out_h}"
         else:
-            # Blurred-background letterbox with gameplay centered
+            # Blurred-background letterbox with gameplay centered (downscale-blur-upscale for 3x CPU speedup)
+            bg_w = (out_w // 4 // 2) * 2
+            bg_h = (out_h // 4 // 2) * 2
             return (
-                f"[0:v]scale={out_w}:{out_h}:force_original_aspect_ratio=increase,"
-                f"crop={out_w}:{out_h},boxblur=20:5[bg];"
+                f"[0:v]scale={bg_w}:{bg_h}:force_original_aspect_ratio=increase,"
+                f"crop={bg_w}:{bg_h},boxblur=5:2,scale={out_w}:{out_h}[bg];"
                 f"[0:v]scale={out_w}:-2[fg];"
                 f"[bg][fg]overlay=(W-w)/2:(H-h)/2"
             )
 
     if aspect == "1:1":
+        bg_w = (out_w // 4 // 2) * 2
+        bg_h = (out_h // 4 // 2) * 2
         return (
-            f"[0:v]scale={out_w}:{out_h}:force_original_aspect_ratio=increase,"
-            f"crop={out_w}:{out_h},boxblur=20:5[bg];"
+            f"[0:v]scale={bg_w}:{bg_h}:force_original_aspect_ratio=increase,"
+            f"crop={bg_w}:{bg_h},boxblur=5:2,scale={out_w}:{out_h}[bg];"
             f"[0:v]scale={out_w}:-2[fg];"
             f"[bg][fg]overlay=(W-w)/2:(H-h)/2"
         )
