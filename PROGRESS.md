@@ -1,9 +1,9 @@
 # Clizzer Build Progress
 
 ## Current State
-- phase: P5
+- phase: P6
 - iteration: 1
-- last_verify_result: PASS (5 passed in 8.08s; 44 total passed)
+- last_verify_result: PASS (1 passed in 52.01s; 45 total passed)
 - open_failures: []
 - decisions: [D001, D002, D003]
 
@@ -14,3 +14,4 @@
 - P3: Vision + Chat complete (scenes, faces, clipzs, ocr, lexicons, lag, features). VERIFY PASS.
 - P4: Text + LLM complete (prompts, segment, llm w/ Groq + 429 + caching + fallbacks, scoring). VERIFY PASS.
 - P5: Fusion/Rank complete (fusion, candidates, snap, dedup, select). VERIFY PASS.
+- P6: Render complete (reframe, captions w/ word highlight + safe margins, render w/ loudnorm -14 LUFS). VERIFY PASS.
