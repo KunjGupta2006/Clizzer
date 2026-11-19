@@ -26,7 +26,7 @@ def get_video_encoder() -> str:
             "-c:v", "h264_nvenc",
             "-f", "null", "-",
         ]
-        proc = run_ffmpeg(test_cmd, timeout=3.0)
+        proc = run_ffmpeg(test_cmd, timeout=3.0, suppress_error_log=True)
         if proc.returncode == 0:
             _ENCODER_CHECKED = "h264_nvenc"
             return _ENCODER_CHECKED

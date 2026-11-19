@@ -193,8 +193,19 @@ def execute_pipeline(job_id: str, params: JobParams) -> List[Clip]:
 
         final_clips: List[Clip] = []
         creator_credit = metadata.get("author") or metadata.get("channel") or ""
+        total_clips = len(ranked_clips)
 
         for idx, clip in enumerate(ranked_clips):
+            clip_prog = 0.85 + (0.13 * (idx / max(1, total_clips)))
+            progress_tracker.update_job_sync(
+                job_id,
+                stage="rendering",
+                progress=round(clip_prog, 2),
+                status="rendering",
+                timings=timings,
+            )
+            logger.info("rendering_clip_progress", clip_num=idx + 1, total=total_clips)
+
             rendered = render_clip(
                 job_id=job_id,
                 clip_idx=idx + 1,
