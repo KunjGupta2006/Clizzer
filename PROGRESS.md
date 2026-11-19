@@ -1,9 +1,9 @@
 # Clizzer Build Progress
 
 ## Current State
-- phase: P7
+- phase: P8
 - iteration: 1
-- last_verify_result: PASS (1 passed in 94.99s; 46 total passed)
+- last_verify_result: PASS (npm run build succeeded; Next.js 14 production build ready)
 - open_failures: []
 - decisions: [D001, D002, D003]
 
@@ -16,3 +16,4 @@
 - P5: Fusion/Rank complete (fusion, candidates, snap, dedup, select). VERIFY PASS.
 - P6: Render complete (reframe, captions w/ word highlight + safe margins, render w/ loudnorm -14 LUFS). VERIFY PASS.
 - P7: API + Orchestrator complete (jobs, clips, ws, cache, progress, test_e2e). VERIFY PASS.
+- P8: Frontend complete (Next.js 14 App Router in web/, SubmitForm, ProgressTimeline, ScoreCurve, ClipCard, TrimHandles, api.ts). VERIFY PASS.
