@@ -11,6 +11,8 @@ engine = create_engine(
 
 def init_db() -> None:
     settings.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # Ensure all models are registered in SQLModel.metadata
+    from backend.app import models  # noqa: F401
     SQLModel.metadata.create_all(engine)
 
 

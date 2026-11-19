@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.app.config import settings
 from backend.app.db import init_db
 from backend.app.logging import logger
+from backend.app.api.jobs import router as jobs_router
+from backend.app.api.clips import router as clips_router
+from backend.app.api.ws import router as ws_router
 
 app = FastAPI(
     title="Clizzer API",
@@ -17,6 +20,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(jobs_router)
+app.include_router(clips_router)
+app.include_router(ws_router)
+
+# Initialize tables immediately
+init_db()
 
 
 @app.on_event("startup")
