@@ -57,9 +57,9 @@ def execute_pipeline(job_id: str, params: JobParams) -> List[Clip]:
         chat_json = job_dir / "chat.json"
 
         if not audio_wav.exists():
-            extract_audio(source_mp4, audio_wav)
+            extract_audio(source_mp4, audio_wav, duration=duration)
         if not proxy_mp4.exists():
-            create_proxy_video(source_mp4, proxy_mp4)
+            create_proxy_video(source_mp4, proxy_mp4, duration=duration)
 
         messages = fetch_chat(params.source_url, chat_json)
         timings["ingest"] = time.time() - t0

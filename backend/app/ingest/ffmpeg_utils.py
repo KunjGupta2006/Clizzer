@@ -15,7 +15,11 @@ except Exception:
     pass
 
 
-def run_ffmpeg(args: list[str], timeout: float = 60.0) -> subprocess.CompletedProcess:
+def run_ffmpeg(
+    args: list[str],
+    timeout: float = 60.0,
+    suppress_error_log: bool = False,
+) -> subprocess.CompletedProcess:
     logger.debug("executing_ffmpeg", args=args)
     try:
         proc = subprocess.run(
@@ -26,7 +30,7 @@ def run_ffmpeg(args: list[str], timeout: float = 60.0) -> subprocess.CompletedPr
             timeout=timeout,
             shell=False,
         )
-        if proc.returncode != 0:
+        if proc.returncode != 0 and not suppress_error_log:
             logger.error("ffmpeg_failed", stderr=proc.stderr, returncode=proc.returncode)
         return proc
     except subprocess.TimeoutExpired as e:
@@ -63,7 +67,7 @@ def validate_source(file_path: Path) -> Dict[str, Any]:
     # Fallback: parse ffmpeg -i output
     ffmpeg_bin = shutil.which("ffmpeg") or "ffmpeg"
     cmd = [ffmpeg_bin, "-i", str(file_path)]
-    proc = run_ffmpeg(cmd, timeout=15.0)
+    proc = run_ffmpeg(cmd, timeout=15.0, suppress_error_log=True)
     stderr = proc.stderr or ""
 
     streams = []
@@ -116,7 +120,7 @@ def get_duration(file_path: Path) -> float:
     raise SourceUnavailable("Could not determine media duration")
 
 
-def extract_audio(source_path: Path, out_wav: Path) -> Path:
+def extract_audio(source_path: Path, out_wav: Path, duration: float = 0.0) -> Path:
     out_wav.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         "ffmpeg",
@@ -128,13 +132,14 @@ def extract_audio(source_path: Path, out_wav: Path) -> Path:
         "-ac", "1",
         str(out_wav),
     ]
-    proc = run_ffmpeg(cmd, timeout=120.0)
+    calc_timeout = max(300.0, float(duration) * 0.35)
+    proc = run_ffmpeg(cmd, timeout=calc_timeout)
     if proc.returncode != 0 or not out_wav.exists() or out_wav.stat().st_size == 0:
         raise SourceUnavailable("Failed to extract audio track as 16kHz mono WAV")
     return out_wav
 
 
-def create_proxy_video(source_path: Path, out_proxy: Path) -> Path:
+def create_proxy_video(source_path: Path, out_proxy: Path, duration: float = 0.0) -> Path:
     out_proxy.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         "ffmpeg",
@@ -143,11 +148,12 @@ def create_proxy_video(source_path: Path, out_proxy: Path) -> Path:
         "-an",
         "-vf", "scale=-2:360,fps=2",
         "-c:v", "libx264",
-        "-preset", "veryfast",
-        "-crf", "28",
+        "-preset", "ultrafast",
+        "-crf", "30",
         str(out_proxy),
     ]
-    proc = run_ffmpeg(cmd, timeout=120.0)
+    calc_timeout = max(300.0, float(duration) * 0.5)
+    proc = run_ffmpeg(cmd, timeout=calc_timeout)
     if proc.returncode != 0 or not out_proxy.exists() or out_proxy.stat().st_size == 0:
         raise SourceUnavailable("Failed to generate 360p 2fps proxy video")
     return out_proxy

@@ -39,9 +39,22 @@ export default function ProgressTimeline({
             {status !== "done" && status !== "failed" && (
               <Loader2 className="w-4 h-4 text-pink-500 animate-spin" />
             )}
+            {status === "failed" && (
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-mono font-bold uppercase">
+                Failed
+              </span>
+            )}
           </h2>
           <p className="text-xs text-gray-400 font-mono mt-0.5">
-            Stage: <span className="text-pink-400 uppercase font-bold">{stage}</span> ({Math.round(progress * 100)}%)
+            Stage:{" "}
+            <span
+              className={`uppercase font-bold ${
+                status === "failed" ? "text-red-400" : "text-pink-400"
+              }`}
+            >
+              {status === "failed" ? "Error / Interrupted" : stage}
+            </span>{" "}
+            ({Math.round(progress * 100)}%)
           </p>
         </div>
 
@@ -61,9 +74,16 @@ export default function ProgressTimeline({
       </div>
 
       {error && (
-        <div className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center space-x-2">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-          <span>Pipeline error: {error}</span>
+        <div className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex flex-col space-y-1.5">
+          <div className="flex items-center space-x-2 font-semibold">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>Pipeline error: {error}</span>
+          </div>
+          {error.includes("timed out") && (
+            <p className="text-[11px] text-gray-300 ml-6">
+              💡 <strong>Tip for long videos:</strong> The submitted video was very long (e.g. multi-hour stream). For fastest clipping on CPU, try videos under 1–2 hours or local video clips.
+            </p>
+          )}
         </div>
       )}
 
