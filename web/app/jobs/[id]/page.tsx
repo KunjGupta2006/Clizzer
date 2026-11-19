@@ -95,12 +95,15 @@ export default function JobDetailPage() {
       console.warn("WS connection failed, falling back to polling", e);
     }
 
-    // Polling fallback
+    // Polling fallback every 3s until job finishes
     const interval = setInterval(() => {
-      if (!job || (job.status !== "done" && job.status !== "failed")) {
-        fetchAllData();
-      }
-    }, 4000);
+      setJob((currentJob) => {
+        if (!currentJob || (currentJob.status !== "done" && currentJob.status !== "failed")) {
+          fetchAllData();
+        }
+        return currentJob;
+      });
+    }, 3000);
 
     return () => {
       clearInterval(interval);
