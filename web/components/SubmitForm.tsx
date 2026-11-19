@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { createJob } from "@/lib/api";
 import { UploadCloud, Link as LinkIcon, Film, Sparkles, AlertCircle } from "lucide-react";
 
+function extractYouTubeId(url: string): string | null {
+  const match = url.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/
+  );
+  return match ? match[1] : null;
+}
+
 export default function SubmitForm() {
   const router = useRouter();
   const [sourceUrl, setSourceUrl] = useState("");
@@ -134,6 +141,46 @@ export default function SubmitForm() {
               <p className="text-xs text-gray-500 mt-1">Up to 2GB file size</p>
             </label>
           </div>
+          {/* Live Preview Container */}
+          {sourceUrl && extractYouTubeId(sourceUrl) && (
+            <div className="mt-3 bg-[#0a0a0f] border border-gray-800 rounded-xl p-3 shadow-inner">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-mono text-pink-400 uppercase font-semibold flex items-center space-x-1.5">
+                  <Film className="w-3.5 h-3.5" />
+                  <span>Live URL Preview</span>
+                </span>
+                <span className="text-[10px] text-gray-500 font-mono">YouTube</span>
+              </div>
+              <div className="relative aspect-video rounded-lg overflow-hidden border border-gray-800 bg-black">
+                <iframe
+                  src={`https://www.youtube-nocookie.com/embed/${extractYouTubeId(sourceUrl)}`}
+                  title="Live YouTube Preview"
+                  className="w-full h-full border-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            </div>
+          )}
+
+          {file && (
+            <div className="mt-3 bg-[#0a0a0f] border border-gray-800 rounded-xl p-3 shadow-inner">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-mono text-cyan-400 uppercase font-semibold flex items-center space-x-1.5">
+                  <Film className="w-3.5 h-3.5" />
+                  <span>Local Video Preview</span>
+                </span>
+                <span className="text-[10px] text-gray-500 font-mono truncate max-w-[200px]">{file.name}</span>
+              </div>
+              <div className="relative aspect-video rounded-lg overflow-hidden border border-gray-800 bg-black">
+                <video
+                  src={URL.createObjectURL(file)}
+                  controls
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Configuration Grid */}

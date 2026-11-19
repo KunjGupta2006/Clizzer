@@ -125,17 +125,20 @@ def render_clip(
     )
 
     has_ass = captions and ass_file.exists()
-    ass_str = str(ass_file.resolve()).replace("\\", "/").replace(":", "\\:") if has_ass else ""
+    try:
+        ass_str = ass_file.relative_to(Path.cwd()).as_posix()
+    except Exception:
+        ass_str = str(ass_file.resolve()).replace("\\", "/").replace(":", "\\:") if has_ass else ""
 
     is_complex = ";" in reframe_filter
     if is_complex:
         if has_ass:
-            filter_complex = f"{reframe_filter}[v_ov];[v_ov]subtitles='{ass_str}'[v_out]"
+            filter_complex = f"{reframe_filter}[v_ov];[v_ov]subtitles={ass_str}[v_out]"
         else:
             filter_complex = f"{reframe_filter}[v_out]"
     else:
         if has_ass:
-            simple_vf = f"{reframe_filter},subtitles='{ass_str}'"
+            simple_vf = f"{reframe_filter},subtitles={ass_str}"
         else:
             simple_vf = reframe_filter
 

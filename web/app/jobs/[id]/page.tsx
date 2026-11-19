@@ -15,8 +15,15 @@ import {
 import ProgressTimeline from "@/components/ProgressTimeline";
 import ScoreCurve from "@/components/ScoreCurve";
 import ClipCard from "@/components/ClipCard";
-import { Sliders, RefreshCw, AlertCircle, ArrowLeft } from "lucide-react";
+import { Sliders, RefreshCw, AlertCircle, ArrowLeft, Film } from "lucide-react";
 import Link from "next/link";
+
+function extractYouTubeId(url: string): string | null {
+  const match = url?.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/
+  );
+  return match ? match[1] : null;
+}
 
 export default function JobDetailPage() {
   const params = useParams();
@@ -174,6 +181,30 @@ export default function JobDetailPage() {
         timings={job.timings || {}}
         error={job.error}
       />
+
+      {/* Live Video Preview Card */}
+      {job.params?.source_url && extractYouTubeId(job.params.source_url) && (
+        <div className="bg-[#14151d] border border-gray-800 rounded-2xl p-5 shadow-xl">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-mono text-pink-400 font-semibold flex items-center space-x-2">
+              <Film className="w-4 h-4" />
+              <span>Source Video Preview</span>
+            </span>
+            <span className="text-xs text-gray-500 font-mono truncate max-w-sm">
+              {job.params.source_url}
+            </span>
+          </div>
+          <div className="relative aspect-video max-h-96 w-full rounded-xl overflow-hidden border border-gray-800 bg-black">
+            <iframe
+              src={`https://www.youtube-nocookie.com/embed/${extractYouTubeId(job.params.source_url)}`}
+              title="Source Video Preview"
+              className="w-full h-full border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      )}
 
       {/* Multimodal Score Curve */}
       {curve && <ScoreCurve curve={curve} clips={clips} />}
