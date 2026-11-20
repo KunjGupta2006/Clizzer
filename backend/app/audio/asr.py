@@ -29,13 +29,18 @@ def get_whisper_model(download_root: Optional[str] = None) -> Optional[Any]:
     try:
         device = "cuda" if HAS_CUDA else "cpu"
         compute_type = "float16" if HAS_CUDA else "int8"
-        model_size = "large-v3" if HAS_CUDA else "small"
+        model_size = "base" if HAS_CUDA else "tiny"
         logger.info("loading_whisper_model", device=device, compute_type=compute_type, model_size=model_size)
         try:
-            _WHISPER_MODEL = WhisperModel(model_size, device=device, compute_type=compute_type, local_files_only=True)
+            _WHISPER_MODEL = WhisperModel(
+                model_size,
+                device=device,
+                compute_type=compute_type,
+                download_root=download_root,
+            )
             return _WHISPER_MODEL
-        except Exception:
-            logger.warning("whisper_local_weights_not_cached", fallback="empty_transcript")
+        except Exception as e:
+            logger.warning("whisper_load_attempt_failed", error=str(e), fallback="empty_transcript")
             return None
     except Exception as e:
         logger.warning("whisper_load_failed", error=str(e), fallback="none")
