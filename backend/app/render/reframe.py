@@ -49,26 +49,16 @@ def build_reframe_filter(
         if abs((source_w / max(1, source_h)) - (9.0 / 16.0)) < 0.05:
             return f"scale={out_w}:{out_h}"
 
-        if has_faces:
-            # Crop 9:16 window centered on face
-            crop_w = int(source_h * (9.0 / 16.0))
-            # Ensure even dimensions
-            crop_w = (crop_w // 2) * 2
-            crop_x = int(center_x - crop_w / 2.0)
-            # Clamp to frame bounds
-            crop_x = max(0, min(source_w - crop_w, crop_x))
-            crop_x = (crop_x // 2) * 2
-            return f"crop={crop_w}:{source_h}:{crop_x}:0,scale={out_w}:{out_h}"
-        else:
-            # Blurred-background letterbox with gameplay centered (downscale-blur-upscale for 3x CPU speedup)
-            bg_w = (out_w // 4 // 2) * 2
-            bg_h = (out_h // 4 // 2) * 2
-            return (
-                f"[0:v]scale={bg_w}:{bg_h}:force_original_aspect_ratio=increase,"
-                f"crop={bg_w}:{bg_h},boxblur=5:2,scale={out_w}:{out_h}[bg];"
-                f"[0:v]scale={out_w}:-2[fg];"
-                f"[bg][fg]overlay=(W-w)/2:(H-h)/2"
-            )
+        # Ensure entire screen is 100% visible with zero horizontal cropping
+        # Full video fits cleanly in the 1080x1920 frame with aesthetic blurred background
+        bg_w = (out_w // 4 // 2) * 2
+        bg_h = (out_h // 4 // 2) * 2
+        return (
+            f"[0:v]scale={bg_w}:{bg_h}:force_original_aspect_ratio=increase,"
+            f"crop={bg_w}:{bg_h},boxblur=5:2,scale={out_w}:{out_h}[bg];"
+            f"[0:v]scale={out_w}:-2[fg];"
+            f"[bg][fg]overlay=(W-w)/2:(H-h)/2"
+        )
 
     if aspect == "1:1":
         bg_w = (out_w // 4 // 2) * 2

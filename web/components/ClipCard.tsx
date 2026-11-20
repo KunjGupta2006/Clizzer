@@ -44,7 +44,7 @@ export default function ClipCard({ clip, index, jobId, onClipUpdated }: ClipCard
           poster={clip.thumb ? `/api/proxy?path=${encodeURIComponent(clip.thumb)}` : undefined}
           controls
           playsInline
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
         />
 
         {/* Score Badge */}
