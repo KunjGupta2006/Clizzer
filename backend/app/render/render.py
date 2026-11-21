@@ -72,6 +72,8 @@ def render_clip(
     attribution: str = "",
     captions: bool = True,
     mask_profanity_toggle: bool = True,
+    layout: str = "single",
+    regions: Optional[List[dict]] = None,
 ) -> Clip:
     clip_dir = out_dir / job_id
     clip_dir.mkdir(parents=True, exist_ok=True)
@@ -122,6 +124,8 @@ def render_clip(
         face_tracks=face_tracks,
         start_t=clip.start,
         end_t=clip.end,
+        layout=layout,
+        regions=regions,
     )
 
     has_ass = captions and ass_file.exists()
@@ -143,7 +147,7 @@ def render_clip(
     af_chain = "loudnorm=I=-14:LRA=11:TP=-1.5"
 
     encoder = get_video_encoder()
-    enc_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "19"]
+    enc_args = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "20"]
     if encoder == "h264_nvenc":
         enc_args = ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "21"]
 

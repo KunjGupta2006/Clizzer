@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createJob } from "@/lib/api";
-import { UploadCloud, Link as LinkIcon, Film, Sparkles, AlertCircle } from "lucide-react";
+import { UploadCloud, Link as LinkIcon, Film, Sparkles, AlertCircle, Camera, Layers, Sliders } from "lucide-react";
 
 function extractYouTubeId(url: string): string | null {
   const match = url.match(
@@ -27,6 +27,42 @@ export default function SubmitForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Stream Dual-Frame Layout States
+  const [layout, setLayout] = useState("single"); // "single", "game_top", "cam_top", "pip"
+  const [camX, setCamX] = useState(72);
+  const [camY, setCamY] = useState(5);
+  const [camW, setCamW] = useState(26);
+  const [camH, setCamH] = useState(32);
+
+  const [gameX, setGameX] = useState(0);
+  const [gameY, setGameY] = useState(0);
+  const [gameW, setGameW] = useState(100);
+  const [gameH, setGameH] = useState(100);
+
+  const applyCamPreset = (preset: "top-right" | "top-left" | "bottom-right" | "bottom-left") => {
+    if (preset === "top-right") {
+      setCamX(72);
+      setCamY(5);
+      setCamW(26);
+      setCamH(32);
+    } else if (preset === "top-left") {
+      setCamX(2);
+      setCamY(5);
+      setCamW(26);
+      setCamH(32);
+    } else if (preset === "bottom-right") {
+      setCamX(72);
+      setCamY(63);
+      setCamW(26);
+      setCamH(32);
+    } else if (preset === "bottom-left") {
+      setCamX(2);
+      setCamY(63);
+      setCamW(26);
+      setCamH(32);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -41,6 +77,26 @@ export default function SubmitForm() {
       return;
     }
 
+    const regions =
+      layout !== "single"
+        ? [
+            {
+              label: "cam",
+              x: camX / 100,
+              y: camY / 100,
+              w: camW / 100,
+              h: camH / 100,
+            },
+            {
+              label: "game",
+              x: gameX / 100,
+              y: gameY / 100,
+              w: gameW / 100,
+              h: gameH / 100,
+            },
+          ]
+        : undefined;
+
     setLoading(true);
     try {
       if (file) {
@@ -50,6 +106,10 @@ export default function SubmitForm() {
         formData.append("min_len", minLen.toString());
         formData.append("max_len", maxLen.toString());
         formData.append("aspect", aspect);
+        formData.append("layout", layout);
+        if (regions) {
+          formData.append("regions", JSON.stringify(regions));
+        }
         formData.append("mode", mode);
         formData.append("keywords", keywords);
         formData.append("captions", captions.toString());
@@ -64,6 +124,8 @@ export default function SubmitForm() {
           min_len: minLen,
           max_len: maxLen,
           aspect,
+          layout,
+          regions,
           mode,
           keywords: keywords.split(",").map((k) => k.trim()),
           captions,
@@ -141,6 +203,7 @@ export default function SubmitForm() {
               <p className="text-xs text-gray-500 mt-1">Up to 2GB file size</p>
             </label>
           </div>
+
           {/* Live Preview Container */}
           {sourceUrl && extractYouTubeId(sourceUrl) && (
             <div className="mt-3 bg-[#0a0a0f] border border-gray-800 rounded-xl p-3 shadow-inner">
@@ -218,6 +281,22 @@ export default function SubmitForm() {
 
           <div>
             <label className="block text-xs font-mono uppercase tracking-wider text-gray-400 mb-1.5">
+              Stream Frame Layout
+            </label>
+            <select
+              value={layout}
+              onChange={(e) => setLayout(e.target.value)}
+              className="w-full bg-[#0e0f15] border border-pink-500/50 rounded-xl px-4 py-2 text-sm text-pink-300 font-medium focus:outline-none focus:border-pink-500"
+            >
+              <option value="single">Standard (Full Screen / Blur Letterbox)</option>
+              <option value="game_top">Dual Frame: Game Top, Streamer Bottom</option>
+              <option value="cam_top">Dual Frame: Streamer Top, Game Bottom</option>
+              <option value="pip">Picture-in-Picture (PiP Cam Overlay)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-mono uppercase tracking-wider text-gray-400 mb-1.5">
               Top Clips Count
             </label>
             <input
@@ -230,7 +309,7 @@ export default function SubmitForm() {
             />
           </div>
 
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 sm:col-span-2">
             <div className="flex-1">
               <label className="block text-xs font-mono uppercase tracking-wider text-gray-400 mb-1.5">
                 Min Sec
@@ -259,6 +338,160 @@ export default function SubmitForm() {
             </div>
           </div>
         </div>
+
+        {/* Dual Frame Interactive Region Selector */}
+        {layout !== "single" && (
+          <div className="p-4 rounded-xl bg-[#0a0a0f] border border-pink-500/30 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-pink-400">
+                <Layers className="w-4 h-4" />
+                <span className="text-xs font-mono font-bold uppercase tracking-wider">
+                  Stream Dual-Frame Calibration
+                </span>
+              </div>
+              <span className="text-[11px] text-gray-400 font-mono">
+                {layout === "game_top" && "Top: Game | Bottom: Streamer"}
+                {layout === "cam_top" && "Top: Streamer | Bottom: Game"}
+                {layout === "pip" && "Full Game with Cam PiP Overlay"}
+              </span>
+            </div>
+
+            {/* Visual Stream Mockup */}
+            <div className="relative aspect-video w-full rounded-lg bg-[#14151d] border border-gray-800 overflow-hidden shadow-inner">
+              {/* Gameplay Region */}
+              <div
+                style={{
+                  left: `${gameX}%`,
+                  top: `${gameY}%`,
+                  width: `${gameW}%`,
+                  height: `${gameH}%`,
+                }}
+                className="absolute border-2 border-dashed border-pink-500/70 bg-pink-500/10 flex items-center justify-center transition-all"
+              >
+                <span className="text-[10px] font-mono font-bold text-pink-300 bg-black/60 px-2 py-0.5 rounded">
+                  🎮 Game Footage Region
+                </span>
+              </div>
+
+              {/* Streamer Cam Region */}
+              <div
+                style={{
+                  left: `${camX}%`,
+                  top: `${camY}%`,
+                  width: `${camW}%`,
+                  height: `${camH}%`,
+                }}
+                className="absolute border-2 border-solid border-cyan-400 bg-cyan-400/20 flex items-center justify-center shadow-lg transition-all"
+              >
+                <span className="text-[10px] font-mono font-bold text-cyan-200 bg-black/80 px-1.5 py-0.5 rounded flex items-center space-x-1">
+                  <Camera className="w-3 h-3 text-cyan-400" />
+                  <span>Streamer Cam</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Presets for Streamer Camera */}
+            <div className="space-y-2">
+              <label className="block text-[11px] font-mono text-gray-400 uppercase tracking-wider">
+                Streamer Webcam Presets
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => applyCamPreset("top-right")}
+                  className={`py-1.5 px-3 rounded-lg border font-mono transition ${
+                    camX >= 50 && camY < 50
+                      ? "bg-cyan-500/20 border-cyan-400 text-cyan-300"
+                      : "bg-[#14151d] border-gray-800 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Top-Right
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyCamPreset("top-left")}
+                  className={`py-1.5 px-3 rounded-lg border font-mono transition ${
+                    camX < 50 && camY < 50
+                      ? "bg-cyan-500/20 border-cyan-400 text-cyan-300"
+                      : "bg-[#14151d] border-gray-800 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Top-Left
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyCamPreset("bottom-right")}
+                  className={`py-1.5 px-3 rounded-lg border font-mono transition ${
+                    camX >= 50 && camY >= 50
+                      ? "bg-cyan-500/20 border-cyan-400 text-cyan-300"
+                      : "bg-[#14151d] border-gray-800 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Bottom-Right
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyCamPreset("bottom-left")}
+                  className={`py-1.5 px-3 rounded-lg border font-mono transition ${
+                    camX < 50 && camY >= 50
+                      ? "bg-cyan-500/20 border-cyan-400 text-cyan-300"
+                      : "bg-[#14151d] border-gray-800 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Bottom-Left
+                </button>
+              </div>
+            </div>
+
+            {/* Fine Tuning Sliders */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1 text-[11px] font-mono text-gray-400">
+              <div>
+                <span>Cam X: {camX}%</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={80}
+                  value={camX}
+                  onChange={(e) => setCamX(parseInt(e.target.value) || 0)}
+                  className="w-full accent-cyan-400"
+                />
+              </div>
+              <div>
+                <span>Cam Y: {camY}%</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={75}
+                  value={camY}
+                  onChange={(e) => setCamY(parseInt(e.target.value) || 0)}
+                  className="w-full accent-cyan-400"
+                />
+              </div>
+              <div>
+                <span>Cam Width: {camW}%</span>
+                <input
+                  type="range"
+                  min={15}
+                  max={50}
+                  value={camW}
+                  onChange={(e) => setCamW(parseInt(e.target.value) || 26)}
+                  className="w-full accent-cyan-400"
+                />
+              </div>
+              <div>
+                <span>Cam Height: {camH}%</span>
+                <input
+                  type="range"
+                  min={15}
+                  max={60}
+                  value={camH}
+                  onChange={(e) => setCamH(parseInt(e.target.value) || 32)}
+                  className="w-full accent-cyan-400"
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Keywords */}
         <div>

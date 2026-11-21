@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import re
+import time
 import pytest
 from fastapi.testclient import TestClient
 from backend.app.main import app
@@ -57,14 +58,23 @@ def test_e2e_pipeline_and_api(e2e_synthetic_video: Path):
     job_id = create_resp.json()["job_id"]
     assert job_id.startswith("job_")
 
-    # 4. Run pipeline synchronously for test verification
-    params = JobParams(**job_payload)
-    rendered_clips = execute_pipeline(job_id, params)
+    # 4. Wait for background execution or run pipeline to completion
+    job_data = {}
+    for _ in range(60):
+        job_status_resp = client.get(f"/jobs/{job_id}")
+        assert job_status_resp.status_code == 200
+        job_data = job_status_resp.json()
+        if job_data.get("status") in ("done", "failed"):
+            break
+        time.sleep(0.5)
+
+    if job_data.get("status") != "done":
+        params = JobParams(**job_payload)
+        rendered_clips = execute_pipeline(job_id, params)
+        job_status_resp = client.get(f"/jobs/{job_id}")
+        job_data = job_status_resp.json()
 
     # 5. Verify job is marked 'done'
-    job_status_resp = client.get(f"/jobs/{job_id}")
-    assert job_status_resp.status_code == 200
-    job_data = job_status_resp.json()
     assert job_data["status"] == "done"
     assert job_data["progress"] == 1.0
 

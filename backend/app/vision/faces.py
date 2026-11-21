@@ -91,6 +91,11 @@ def extract_faces_from_proxy(
             if t > duration:
                 break
 
+            # CPU Optimization: Sample every 2nd frame (1 fps analysis) for 2x faster vision pass
+            if frame_idx % 2 != 0:
+                frame_idx += 1
+                continue
+
             # Face detection: Mediapipe mesh or fast OpenCV Cascades (frontal + profile + smile)
             if mesh is not None:
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)

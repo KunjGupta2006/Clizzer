@@ -42,6 +42,9 @@ class ProgressTracker:
         with Session(engine) as session:
             job = session.exec(select(Job).where(Job.id == job_id)).first()
             if job:
+                # Terminal status guarantee: do not regress once done or failed
+                if job.status in ("done", "failed") and status not in ("done", "failed"):
+                    return
                 job.stage = stage
                 job.progress = float(progress)
                 if status != "running":

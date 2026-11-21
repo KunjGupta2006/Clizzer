@@ -13,6 +13,8 @@ class JobParams(BaseModel):
     min_len: int = Field(default=20, ge=5, le=120)
     max_len: int = Field(default=60, ge=10, le=300)
     aspect: str = Field(default="9:16")  # "9:16", "1:1", "16:9"
+    layout: str = Field(default="single")  # "single", "game_top", "cam_top", "pip"
+    regions: Optional[List[Dict[str, Any]]] = None  # e.g. [{"label": "cam", "x": 0.7, "y": 0.05, "w": 0.25, "h": 0.3}, ...]
     mode: str = Field(default="auto")    # "auto", "hype", "funny", "informational"
     keywords: List[str] = Field(default_factory=list)
     captions: bool = True

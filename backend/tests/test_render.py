@@ -92,3 +92,85 @@ def test_render_clip_output(render_source_video: Path, tmp_path: Path):
     meta_data = json.loads(json_meta.read_text(encoding="utf-8"))
     assert meta_data["title"] == "Epic GTA 6 Moment"
     assert meta_data["attribution"] == "@RockstarGames"
+
+
+def test_dual_frame_reframe_filters():
+    from backend.app.render.reframe import build_reframe_filter
+
+    regions = [
+        {"label": "cam", "x": 0.7, "y": 0.1, "w": 0.25, "h": 0.3},
+        {"label": "game", "x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0},
+    ]
+
+    # 1. Game Top / Cam Bottom
+    f_game_top = build_reframe_filter(
+        aspect="9:16",
+        source_w=1920,
+        source_h=1080,
+        layout="game_top",
+        regions=regions,
+    )
+    assert "vstack=inputs=2" in f_game_top
+    assert "crop=" in f_game_top
+    assert "[top_slot][bottom_slot]" in f_game_top
+
+    # 2. Cam Top / Game Bottom
+    f_cam_top = build_reframe_filter(
+        aspect="9:16",
+        source_w=1920,
+        source_h=1080,
+        layout="cam_top",
+        regions=regions,
+    )
+    assert "vstack=inputs=2" in f_cam_top
+
+    # 3. Picture-in-picture
+    f_pip = build_reframe_filter(
+        aspect="9:16",
+        source_w=1920,
+        source_h=1080,
+        layout="pip",
+        regions=regions,
+    )
+    assert "pip_cam" in f_pip or "drawbox=" in f_pip
+
+
+def test_render_clip_dual_stream_layout(render_source_video: Path, tmp_path: Path):
+    job_id = "test_dual_layout_job"
+    clip = Clip(
+        start=2.0,
+        end=7.0,
+        peak_t=4.0,
+        fused_score=3.1,
+        title="Streamer Clutch Reaction",
+        hook="Insane 1v3!",
+    )
+    words = [Word(start=2.5, end=4.0, text="Unbelievable!")]
+
+    regions = [
+        {"label": "cam", "x": 0.7, "y": 0.1, "w": 0.25, "h": 0.3},
+        {"label": "game", "x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0},
+    ]
+
+    rendered = render_clip(
+        job_id=job_id,
+        clip_idx=1,
+        source_path=render_source_video,
+        clip=clip,
+        words=words,
+        aspect="9:16",
+        out_dir=tmp_path / "out",
+        captions=True,
+        layout="game_top",
+        regions=regions,
+    )
+
+    clip_file = Path(rendered.file)
+    assert clip_file.exists()
+    assert clip_file.stat().st_size > 0
+
+    info = validate_source(clip_file)
+    v_stream = next(s for s in info["streams"] if s["codec_type"] == "video")
+    assert v_stream["width"] == 1080
+    assert v_stream["height"] == 1920
+

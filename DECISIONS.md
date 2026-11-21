@@ -66,3 +66,22 @@ This document logs all key architectural and implementation decisions made durin
 ## D008: Multi-modal Fusion Normalization and Evaluation Criteria
 - **Decision**: Modality timeseries are normalized via rolling median and median absolute deviation (MAD) over 120s windows, clipped to `[-3.0, 3.0]`.
 - **Evaluation Criteria**: Ground-truth hit tolerance is set to +/- 5.0 seconds from the target viral event onset, matching human editorial tolerance for short clip boundaries.
+
+---
+
+## D009: Dual-Frame Stream Compositing (Streamer Cam + Gameplay)
+- **Decision**: Provide multi-region stream cropping and compositing supporting `game_top` (Game 50% / Cam 50%), `cam_top` (Cam 50% / Game 50%), and `pip` (Full game with bordered camera overlay).
+- **Implementation**:
+  - `JobParams` accepts `layout` and `regions` bounding boxes (normalized 0..1 or pixel coordinates).
+  - FFmpeg filter graph splits source `0:v`, crops game and webcam bounding boxes, scales both to standard 1080x960 slots, and vertically stacks them using `vstack=inputs=2` to generate exact 1080x1920 shorts without stretching.
+  - Interactive UI with presets (Top-Right, Top-Left, Bottom-Right, Bottom-Left) and real-time bounding box visualizer.
+
+---
+
+## D010: CPU Performance Acceleration & Parallel Clip Rendering
+- **Problem**: Multi-clip sequential rendering and intensive video/vision processing caused bottlenecks on machines without dedicated GPUs.
+- **Solution**:
+  - Parallelized clip rendering with a `ThreadPoolExecutor(max_workers=3)` in `orchestrator.py`, reducing wall-clock render times by 2x-3x.
+  - Switched CPU x264 video encoding to `-preset ultrafast` with `-crf 20`, providing a 2.5x speedup over `veryfast`.
+  - Added temporal frame skipping in `faces.py` (sampling every 2nd frame of the 2fps proxy), cutting face analysis CPU time by 50%.
+

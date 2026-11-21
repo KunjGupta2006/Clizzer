@@ -186,39 +186,52 @@ def execute_pipeline(job_id: str, params: JobParams) -> List[Clip]:
         timings["ranking"] = time.time() - t4
 
         # ==========================================
-        # S7: RENDER CLIPS
+        # S7: RENDER CLIPS (Parallelized on multi-core CPU)
         # ==========================================
         t5 = time.time()
         progress_tracker.update_job_sync(job_id, stage="rendering", progress=0.85, status="rendering", timings=timings)
 
-        final_clips: List[Clip] = []
         creator_credit = metadata.get("author") or metadata.get("channel") or ""
         total_clips = len(ranked_clips)
+        rendered_clips_map: Dict[int, Clip] = {}
+        completed_renders = 0
 
-        for idx, clip in enumerate(ranked_clips):
-            clip_prog = 0.85 + (0.13 * (idx / max(1, total_clips)))
-            progress_tracker.update_job_sync(
-                job_id,
-                stage="rendering",
-                progress=round(clip_prog, 2),
-                status="rendering",
-                timings=timings,
-            )
-            logger.info("rendering_clip_progress", clip_num=idx + 1, total=total_clips)
-
-            rendered = render_clip(
+        def _do_render(idx: int, target_clip: Clip) -> tuple[int, Clip]:
+            res = render_clip(
                 job_id=job_id,
                 clip_idx=idx + 1,
                 source_path=source_mp4,
-                clip=clip,
+                clip=target_clip,
                 words=words,
                 face_tracks=face_tracks,
                 aspect=params.aspect,
                 out_dir=settings.OUT_DIR,
                 attribution=creator_credit,
                 captions=params.captions,
+                layout=getattr(params, "layout", "single"),
+                regions=getattr(params, "regions", None),
             )
-            final_clips.append(rendered)
+            return idx, res
+
+        # Run concurrent renders (up to 3 parallel processes)
+        max_workers = min(3, max(1, total_clips))
+        with ThreadPoolExecutor(max_workers=max_workers) as render_executor:
+            futures = [render_executor.submit(_do_render, idx, c) for idx, c in enumerate(ranked_clips)]
+            for fut in futures:
+                idx, rendered = fut.result()
+                rendered_clips_map[idx] = rendered
+                completed_renders += 1
+                clip_prog = 0.85 + (0.13 * (completed_renders / max(1, total_clips)))
+                progress_tracker.update_job_sync(
+                    job_id,
+                    stage="rendering",
+                    progress=round(clip_prog, 2),
+                    status="rendering",
+                    timings=timings,
+                )
+                logger.info("rendering_clip_progress", clip_num=idx + 1, total=total_clips)
+
+        final_clips = [rendered_clips_map[i] for i in range(total_clips)]
 
         timings["rendering"] = time.time() - t5
         timings["total"] = sum(timings.values())

@@ -55,6 +55,15 @@ async def create_job(
         kw_raw = form.get("keywords")
         kw_list = [k.strip() for k in kw_raw.split(",")] if kw_raw else []
 
+        layout = str(form.get("layout", "single"))
+        regions_raw = form.get("regions")
+        parsed_regions = None
+        if regions_raw:
+            try:
+                parsed_regions = json.loads(str(regions_raw)) if isinstance(regions_raw, str) else regions_raw
+            except Exception:
+                parsed_regions = None
+
         try:
             params = JobParams(
                 source_url=str(source_url) if source_url else None,
@@ -63,6 +72,8 @@ async def create_job(
                 min_len=int(form.get("min_len", 20)),
                 max_len=int(form.get("max_len", 60)),
                 aspect=str(form.get("aspect", "9:16")),
+                layout=layout,
+                regions=parsed_regions,
                 mode=str(form.get("mode", "auto")),
                 keywords=kw_list,
                 captions=str(form.get("captions", "true")).lower() in ("true", "1"),
