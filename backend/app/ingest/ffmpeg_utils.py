@@ -143,12 +143,14 @@ def extract_audio(source_path: Path, out_wav: Path, duration: float = 0.0) -> Pa
 
 def create_proxy_video(source_path: Path, out_proxy: Path, duration: float = 0.0) -> Path:
     out_proxy.parent.mkdir(parents=True, exist_ok=True)
+    fps_val = "1" if duration > 1800.0 else "2"
     cmd = [
         "ffmpeg",
         "-y",
+        "-threads", "0",
         "-i", str(source_path),
         "-an",
-        "-vf", "scale=-2:360,fps=2",
+        "-vf", f"scale=-2:360,fps={fps_val}",
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-crf", "30",
@@ -157,7 +159,7 @@ def create_proxy_video(source_path: Path, out_proxy: Path, duration: float = 0.0
     calc_timeout = max(300.0, float(duration) * 0.5)
     proc = run_ffmpeg(cmd, timeout=calc_timeout)
     if proc.returncode != 0 or not out_proxy.exists() or out_proxy.stat().st_size == 0:
-        raise SourceUnavailable("Failed to generate 360p 2fps proxy video")
+        raise SourceUnavailable("Failed to generate 360p proxy video")
     return out_proxy
 
 

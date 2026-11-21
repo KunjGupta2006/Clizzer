@@ -70,11 +70,63 @@ def execute_pipeline(job_id: str, params: JobParams) -> List[Clip]:
         t1 = time.time()
         progress_tracker.update_job_sync(job_id, stage="transcribing", progress=0.25, status="transcribing", timings=timings)
 
-        segments, words = transcribe_audio(audio_wav)
-        intervals, diar_method = diarize_audio(audio_wav, hf_token=settings.HF_TOKEN)
-        words = assign_speakers_to_words(words, intervals)
+        if duration > 600.0:
+            # Hierarchical coarse-to-fine audio indexing for 3+ hour videos on CPU
+            logger.info("running_hierarchical_audio_pipeline", duration=duration)
+            raw_audio_feats, audio_score, music_ratio, audio_avail = compute_audio_features(
+                audio_wav, duration, words=[]
+            )
 
-        raw_audio_feats, audio_score, music_ratio, audio_avail = compute_audio_features(audio_wav, duration, words)
+            # Combine audio excitement with live chat spikes if available
+            combined_signal = np.copy(audio_score)
+            if messages:
+                raw_chat_init, chat_sc_init, chat_ok_init = compute_chat_features(
+                    messages=messages,
+                    duration=duration,
+                    audio_energy=raw_audio_feats.get("rms"),
+                    keywords=params.keywords,
+                )
+                if chat_ok_init:
+                    combined_signal += chat_sc_init
+
+            from scipy.signal import find_peaks
+            peak_dist = min(300, max(45, int(duration * 0.01)))
+            prominent_peaks, _ = find_peaks(combined_signal, distance=peak_dist, prominence=0.4)
+            if len(prominent_peaks) == 0:
+                prominent_peaks, _ = find_peaks(combined_signal, distance=peak_dist)
+            if len(prominent_peaks) == 0:
+                prominent_peaks = np.arange(30, int(duration) - 30, 300)
+
+            # Sort candidate excitement peaks descending and select top 25 intervals
+            sorted_peaks = sorted(
+                prominent_peaks,
+                key=lambda p: float(combined_signal[p]) if p < len(combined_signal) else 0.0,
+                reverse=True,
+            )[:25]
+
+            candidate_intervals = []
+            for p in sorted_peaks:
+                st = max(0.0, float(p) - 30.0)
+                et = min(duration, float(p) + 30.0)
+                candidate_intervals.append((st, et))
+
+            # Transcribe only candidate excitement intervals (takes ~60-90s on CPU instead of 60+ minutes)
+            segments, words = transcribe_audio(audio_wav, intervals=candidate_intervals)
+            intervals_diar, diar_method = diarize_audio(audio_wav, hf_token=settings.HF_TOKEN)
+            words = assign_speakers_to_words(words, intervals_diar)
+
+            # Refine audio features with exact transcribed words
+            raw_audio_feats, audio_score, music_ratio, audio_avail = compute_audio_features(
+                audio_wav, duration, words
+            )
+        else:
+            segments, words = transcribe_audio(audio_wav)
+            intervals_diar, diar_method = diarize_audio(audio_wav, hf_token=settings.HF_TOKEN)
+            words = assign_speakers_to_words(words, intervals_diar)
+            raw_audio_feats, audio_score, music_ratio, audio_avail = compute_audio_features(
+                audio_wav, duration, words
+            )
+
         timings["audio"] = time.time() - t1
 
         # ==========================================

@@ -29,16 +29,19 @@ def find_candidate_peaks(
             idx = n - 1 - i
             series_for_peaks[idx] *= (0.3 + 0.7 * (i / max(1, outro_len)))
 
+    # Adaptive peak distance based on stream length: prevents clustering in multi-hour streams
+    effective_distance = min(300, max(distance_sec, int(duration * 0.012)))
+
     # Detect peaks
     peaks, properties = find_peaks(
         series_for_peaks,
         prominence=prominence,
-        distance=distance_sec,
+        distance=effective_distance,
     )
 
     # If no prominent peaks found, fall back to top local maxima
     if len(peaks) == 0:
-        peaks, _ = find_peaks(series_for_peaks, distance=distance_sec)
+        peaks, _ = find_peaks(series_for_peaks, distance=effective_distance)
         if len(peaks) == 0:
             # Fall back to argmax
             peaks = np.array([int(np.argmax(series_for_peaks))])

@@ -125,8 +125,9 @@ def select_top_clips(
         for c in candidates
     ]
 
-    # 4. Deduplicate (NMS + MMR)
-    deduped = deduplicate_candidates(snapped, min_spacing_sec=45.0, iou_threshold=0.3, mmr_lambda=0.7)
+    # 4. Deduplicate (NMS + MMR) with stream-length-aware temporal spacing
+    effective_spacing = min(300.0, max(45.0, duration * 0.01))
+    deduped = deduplicate_candidates(snapped, min_spacing_sec=effective_spacing, iou_threshold=0.3, mmr_lambda=0.7)
 
     # 5. Quality floor check (fused >= 0.8)
     qualified = [c for c in deduped if c.fused_score >= quality_floor]

@@ -255,9 +255,9 @@ export default function SubmitForm() {
             <label htmlFor="file-upload" className="cursor-pointer">
               <UploadCloud className="mx-auto h-8 w-8 text-pink-500 mb-2" />
               <p className="text-sm font-medium text-gray-300">
-                {file ? file.name : "Drop MP4, MKV, or WebM here, or browse"}
+                {file ? file.name : "Drop MP4, MKV, or WebM here, or browse (multi-hour streams & large files supported)"}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Up to 2GB file size</p>
+              <p className="text-xs text-gray-500 mt-1">Multi-gigabyte uploads streamed direct-to-disk • 3+ hour videos accelerated</p>
             </label>
           </div>
 

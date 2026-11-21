@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import shutil
 import uuid
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
@@ -49,8 +50,9 @@ async def create_job(
             job_temp_dir = settings.DATA_DIR / "uploads"
             job_temp_dir.mkdir(parents=True, exist_ok=True)
             saved_file_path = str(job_temp_dir / f"{uuid.uuid4()}_{file.filename}")
-            content = await file.read()
-            Path(saved_file_path).write_bytes(content)
+            # Stream directly to disk to handle large multi-gigabyte files with 0 RAM overhead
+            with open(saved_file_path, "wb") as f_out:
+                shutil.copyfileobj(file.file, f_out, length=64 * 1024 * 1024)
 
         kw_raw = form.get("keywords")
         kw_list = [k.strip() for k in kw_raw.split(",")] if kw_raw else []

@@ -122,12 +122,15 @@ def compute_audio_features(
     excitement, music_ratio, _ = detect_audio_events(wav_path, duration, y=y, sr=sr)
     raw_features["event_excitement"] = excitement
 
-    # Normalize each component with 120s rolling median/MAD
-    norm_rms = rolling_median_mad(raw_features["rms"], window_size=120)
-    norm_flux = rolling_median_mad(raw_features["spectral_flux"], window_size=120)
-    norm_pitch = rolling_median_mad(raw_features["pitch_var"], window_size=120)
-    norm_rate = rolling_median_mad(raw_features["speech_rate"], window_size=120)
-    norm_events = rolling_median_mad(raw_features["event_excitement"], window_size=120)
+    # Dynamic adaptive window based on duration (120s for short clips up to 480s for 3+ hour streams)
+    adaptive_window = min(480, max(120, int(duration * 0.03)))
+
+    # Normalize each component with adaptive rolling median/MAD
+    norm_rms = rolling_median_mad(raw_features["rms"], window_size=adaptive_window)
+    norm_flux = rolling_median_mad(raw_features["spectral_flux"], window_size=adaptive_window)
+    norm_pitch = rolling_median_mad(raw_features["pitch_var"], window_size=adaptive_window)
+    norm_rate = rolling_median_mad(raw_features["speech_rate"], window_size=adaptive_window)
+    norm_events = rolling_median_mad(raw_features["event_excitement"], window_size=adaptive_window)
 
     # Formula: audio_score = .35 rms + .2 flux + .15 pitch_var + .15 speech_rate + .15 event_excitement
     audio_score = (
