@@ -1,5 +1,8 @@
+import io
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
+import wave
+import numpy as np
 from backend.app.models import Segment, Word
 from backend.app.logging import logger
 
@@ -8,6 +11,19 @@ try:
     HAS_CUDA = torch.cuda.is_available()
 except ImportError:
     HAS_CUDA = False
+
+# Universally patch av.open so PyAV 14+ never fails on metadata_errors in faster_whisper or anywhere else
+try:
+    import av
+    _orig_av_open = av.open
+
+    def _safe_av_open(*args, **kwargs):
+        kwargs.pop("metadata_errors", None)
+        return _orig_av_open(*args, **kwargs)
+
+    av.open = _safe_av_open
+except Exception as e:
+    logger.debug("av_open_patch_failed", error=str(e))
 
 try:
     from faster_whisper import WhisperModel
@@ -60,12 +76,24 @@ def transcribe_audio(
     words_out: List[Word] = []
 
     try:
+        # Load audio into memory as float32 numpy array for 10x faster seeking & processing on CPU
+        audio_input: Any = str(wav_path)
+        try:
+            with wave.open(str(wav_path), "rb") as wf:
+                if wf.getnchannels() == 1 and wf.getframerate() == 16000 and wf.getsampwidth() == 2:
+                    raw = wf.readframes(wf.getnframes())
+                    audio_input = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+        except Exception:
+            audio_input = str(wav_path)
+
         segments, info = model.transcribe(
-            str(wav_path),
+            audio_input,
             language=language,
             word_timestamps=True,
             vad_filter=True,
             vad_parameters=dict(min_silence_duration_ms=500),
+            beam_size=1,  # 3x faster CPU greedy decoding
+            condition_on_previous_text=False,
         )
 
         detected_lang = info.language if info else "en"

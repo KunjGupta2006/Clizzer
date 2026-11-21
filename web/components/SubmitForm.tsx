@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createJob } from "@/lib/api";
-import { UploadCloud, Link as LinkIcon, Film, Sparkles, AlertCircle, Camera, Layers, Sliders } from "lucide-react";
+import { UploadCloud, Link as LinkIcon, Film, Sparkles, AlertCircle, Camera, Layers, Sliders, CheckCircle2, Wand2 } from "lucide-react";
 
 function extractYouTubeId(url: string): string | null {
   const match = url.match(
@@ -36,7 +36,7 @@ export default function SubmitForm() {
 
   const [gameX, setGameX] = useState(0);
   const [gameY, setGameY] = useState(0);
-  const [gameW, setGameW] = useState(100);
+  const [gameW, setGameW] = useState(72);
   const [gameH, setGameH] = useState(100);
 
   const applyCamPreset = (preset: "top-right" | "top-left" | "bottom-right" | "bottom-left") => {
@@ -45,21 +45,78 @@ export default function SubmitForm() {
       setCamY(5);
       setCamW(26);
       setCamH(32);
+      // Auto-exclude from game view
+      setGameX(0);
+      setGameY(0);
+      setGameW(72);
+      setGameH(100);
     } else if (preset === "top-left") {
       setCamX(2);
       setCamY(5);
       setCamW(26);
       setCamH(32);
+      // Auto-exclude from game view
+      setGameX(28);
+      setGameY(0);
+      setGameW(72);
+      setGameH(100);
     } else if (preset === "bottom-right") {
       setCamX(72);
       setCamY(63);
       setCamW(26);
       setCamH(32);
+      setGameX(0);
+      setGameY(0);
+      setGameW(72);
+      setGameH(100);
     } else if (preset === "bottom-left") {
       setCamX(2);
       setCamY(63);
       setCamW(26);
       setCamH(32);
+      setGameX(28);
+      setGameY(0);
+      setGameW(72);
+      setGameH(100);
+    }
+  };
+
+  const applyGamePreset = (preset: "full" | "exclude-right" | "exclude-left" | "center") => {
+    if (preset === "full") {
+      setGameX(0);
+      setGameY(0);
+      setGameW(100);
+      setGameH(100);
+    } else if (preset === "exclude-right") {
+      setGameX(0);
+      setGameY(0);
+      setGameW(72);
+      setGameH(100);
+    } else if (preset === "exclude-left") {
+      setGameX(28);
+      setGameY(0);
+      setGameW(72);
+      setGameH(100);
+    } else if (preset === "center") {
+      setGameX(14);
+      setGameY(0);
+      setGameW(72);
+      setGameH(100);
+    }
+  };
+
+  const autoExcludeCam = () => {
+    if (camX >= 50) {
+      setGameX(0);
+      setGameY(0);
+      setGameW(Math.max(40, camX));
+      setGameH(100);
+    } else {
+      const startX = Math.min(60, camX + camW);
+      setGameX(startX);
+      setGameY(0);
+      setGameW(100 - startX);
+      setGameH(100);
     }
   };
 
@@ -349,11 +406,14 @@ export default function SubmitForm() {
                   Stream Dual-Frame Calibration
                 </span>
               </div>
-              <span className="text-[11px] text-gray-400 font-mono">
-                {layout === "game_top" && "Top: Game | Bottom: Streamer"}
-                {layout === "cam_top" && "Top: Streamer | Bottom: Game"}
-                {layout === "pip" && "Full Game with Cam PiP Overlay"}
-              </span>
+              <button
+                type="button"
+                onClick={autoExcludeCam}
+                className="text-[11px] text-pink-400 hover:text-pink-300 font-mono flex items-center space-x-1 bg-pink-500/10 px-2 py-1 rounded border border-pink-500/20"
+              >
+                <Wand2 className="w-3 h-3" />
+                <span>AI Auto-Exclude Cam from Game</span>
+              </button>
             </div>
 
             {/* Visual Stream Mockup */}
@@ -368,8 +428,8 @@ export default function SubmitForm() {
                 }}
                 className="absolute border-2 border-dashed border-pink-500/70 bg-pink-500/10 flex items-center justify-center transition-all"
               >
-                <span className="text-[10px] font-mono font-bold text-pink-300 bg-black/60 px-2 py-0.5 rounded">
-                  🎮 Game Footage Region
+                <span className="text-[10px] font-mono font-bold text-pink-300 bg-black/70 px-2 py-0.5 rounded">
+                  🎮 Game View ({gameW}×{gameH}%)
                 </span>
               </div>
 
@@ -390,10 +450,63 @@ export default function SubmitForm() {
               </div>
             </div>
 
-            {/* Quick Presets for Streamer Camera */}
-            <div className="space-y-2">
+            {/* Gameplay Presets */}
+            <div className="space-y-1.5">
               <label className="block text-[11px] font-mono text-gray-400 uppercase tracking-wider">
-                Streamer Webcam Presets
+                1. Gameplay Region (Exclude Cam to Avoid Duplicate Face)
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => applyGamePreset("exclude-right")}
+                  className={`py-1.5 px-3 rounded-lg border font-mono transition ${
+                    gameW < 100 && gameX === 0
+                      ? "bg-pink-500/20 border-pink-400 text-pink-300"
+                      : "bg-[#14151d] border-gray-800 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Exclude Right Cam
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyGamePreset("exclude-left")}
+                  className={`py-1.5 px-3 rounded-lg border font-mono transition ${
+                    gameX > 0
+                      ? "bg-pink-500/20 border-pink-400 text-pink-300"
+                      : "bg-[#14151d] border-gray-800 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Exclude Left Cam
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyGamePreset("center")}
+                  className={`py-1.5 px-3 rounded-lg border font-mono transition ${
+                    gameX > 0 && gameW < 80
+                      ? "bg-pink-500/20 border-pink-400 text-pink-300"
+                      : "bg-[#14151d] border-gray-800 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Center Gameplay
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyGamePreset("full")}
+                  className={`py-1.5 px-3 rounded-lg border font-mono transition ${
+                    gameW === 100 && gameX === 0
+                      ? "bg-pink-500/20 border-pink-400 text-pink-300"
+                      : "bg-[#14151d] border-gray-800 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Full Screen
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Presets for Streamer Camera */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-mono text-gray-400 uppercase tracking-wider">
+                2. Streamer Webcam Position
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <button
@@ -443,51 +556,109 @@ export default function SubmitForm() {
               </div>
             </div>
 
-            {/* Fine Tuning Sliders */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1 text-[11px] font-mono text-gray-400">
-              <div>
-                <span>Cam X: {camX}%</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={80}
-                  value={camX}
-                  onChange={(e) => setCamX(parseInt(e.target.value) || 0)}
-                  className="w-full accent-cyan-400"
-                />
+            {/* Fine Tuning Sliders: Streamer Camera */}
+            <div className="pt-2 border-t border-gray-800/80">
+              <span className="text-[11px] font-mono text-cyan-400 block mb-2 font-semibold">
+                Adjust Streamer Cam Box
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px] font-mono text-gray-400">
+                <div>
+                  <span>Cam X: {camX}%</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={80}
+                    value={camX}
+                    onChange={(e) => setCamX(parseInt(e.target.value) || 0)}
+                    className="w-full accent-cyan-400"
+                  />
+                </div>
+                <div>
+                  <span>Cam Y: {camY}%</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={75}
+                    value={camY}
+                    onChange={(e) => setCamY(parseInt(e.target.value) || 0)}
+                    className="w-full accent-cyan-400"
+                  />
+                </div>
+                <div>
+                  <span>Cam W: {camW}%</span>
+                  <input
+                    type="range"
+                    min={15}
+                    max={50}
+                    value={camW}
+                    onChange={(e) => setCamW(parseInt(e.target.value) || 26)}
+                    className="w-full accent-cyan-400"
+                  />
+                </div>
+                <div>
+                  <span>Cam H: {camH}%</span>
+                  <input
+                    type="range"
+                    min={15}
+                    max={60}
+                    value={camH}
+                    onChange={(e) => setCamH(parseInt(e.target.value) || 32)}
+                    className="w-full accent-cyan-400"
+                  />
+                </div>
               </div>
-              <div>
-                <span>Cam Y: {camY}%</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={75}
-                  value={camY}
-                  onChange={(e) => setCamY(parseInt(e.target.value) || 0)}
-                  className="w-full accent-cyan-400"
-                />
-              </div>
-              <div>
-                <span>Cam Width: {camW}%</span>
-                <input
-                  type="range"
-                  min={15}
-                  max={50}
-                  value={camW}
-                  onChange={(e) => setCamW(parseInt(e.target.value) || 26)}
-                  className="w-full accent-cyan-400"
-                />
-              </div>
-              <div>
-                <span>Cam Height: {camH}%</span>
-                <input
-                  type="range"
-                  min={15}
-                  max={60}
-                  value={camH}
-                  onChange={(e) => setCamH(parseInt(e.target.value) || 32)}
-                  className="w-full accent-cyan-400"
-                />
+            </div>
+
+            {/* Fine Tuning Sliders: Gameplay Box */}
+            <div className="pt-2 border-t border-gray-800/80">
+              <span className="text-[11px] font-mono text-pink-400 block mb-2 font-semibold">
+                Adjust Gameplay Box
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px] font-mono text-gray-400">
+                <div>
+                  <span>Game X: {gameX}%</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={60}
+                    value={gameX}
+                    onChange={(e) => setGameX(parseInt(e.target.value) || 0)}
+                    className="w-full accent-pink-400"
+                  />
+                </div>
+                <div>
+                  <span>Game Y: {gameY}%</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={50}
+                    value={gameY}
+                    onChange={(e) => setGameY(parseInt(e.target.value) || 0)}
+                    className="w-full accent-pink-400"
+                  />
+                </div>
+                <div>
+                  <span>Game W: {gameW}%</span>
+                  <input
+                    type="range"
+                    min={40}
+                    max={100}
+                    value={gameW}
+                    onChange={(e) => setGameW(parseInt(e.target.value) || 72)}
+                    className="w-full accent-pink-400"
+                  />
+                </div>
+                <div>
+                  <span>Game H: {gameH}%</span>
+                  <input
+                    type="range"
+                    min={40}
+                    max={100}
+                    value={gameH}
+                    onChange={(e) => setGameH(parseInt(e.target.value) || 100)}
+                    className="w-full accent-pink-400"
+                  />
+                </div>
               </div>
             </div>
           </div>

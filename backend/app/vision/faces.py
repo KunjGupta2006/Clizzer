@@ -81,6 +81,12 @@ def extract_faces_from_proxy(
     frame_idx = 0
     raw_tracks: List[FaceFrame] = []
 
+    frame_step = 2
+    if duration > 1800.0:
+        frame_step = 4
+    elif duration > 600.0:
+        frame_step = 3
+
     try:
         while True:
             ret, frame = cap.read()
@@ -91,8 +97,8 @@ def extract_faces_from_proxy(
             if t > duration:
                 break
 
-            # CPU Optimization: Sample every 2nd frame (1 fps analysis) for 2x faster vision pass
-            if frame_idx % 2 != 0:
+            # Adaptive CPU sampling: 1-2 checks/sec based on stream length to prevent multi-hour stalls
+            if frame_idx % frame_step != 0:
                 frame_idx += 1
                 continue
 

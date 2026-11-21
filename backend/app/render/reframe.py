@@ -95,16 +95,39 @@ def build_reframe_filter(
         gx, gy, gw, gh = _parse_crop_box(game_reg, 0.0, 0.0, 1.0, 1.0, source_w, source_h)
         cx, cy, cw, ch = _parse_crop_box(cam_reg, 0.72, 0.05, 0.26, 0.32, source_w, source_h)
 
+        # Smart exclusion: If gameplay is full-screen, automatically crop gameplay so the streamer webcam
+        # does NOT appear duplicated inside the gameplay frame!
+        is_default_game = not game_reg or (gx == 0 and gy == 0 and gw >= source_w - 4 and gh >= source_h - 4)
+        if is_default_game and cam_reg:
+            if cx > source_w * 0.45:
+                # Camera is in right section; crop game to left portion
+                gw = min(gw, cx)
+                gw = (gw // 2) * 2
+            elif cx + cw < source_w * 0.55:
+                # Camera is in left section; crop game to right portion
+                new_gx = cx + cw
+                gw = source_w - new_gx
+                gx = (new_gx // 2) * 2
+                gw = (gw // 2) * 2
+
         half_h = out_h // 2  # 960
+
+        # High-Quality slot scaling: preserves crisp native sharpness with aesthetic dark padding (no pixelated over-zoom)
+        game_filter = (
+            f"crop={gw}:{gh}:{gx}:{gy},scale={out_w}:{half_h}:force_original_aspect_ratio=decrease,"
+            f"pad={out_w}:{half_h}:(ow-iw)/2:(oh-ih)/2:color=0x0a0a0f"
+        )
+        cam_filter = (
+            f"crop={cw}:{ch}:{cx}:{cy},scale={out_w}:{half_h}:force_original_aspect_ratio=decrease,"
+            f"pad={out_w}:{half_h}:(ow-iw)/2:(oh-ih)/2:color=0x0a0a0f"
+        )
 
         if norm_layout == "game_top":
             # Game on top half (1080x960), Streamer Cam on bottom half (1080x960)
             return (
                 f"[0:v]split=2[in_g][in_c];"
-                f"[in_g]crop={gw}:{gh}:{gx}:{gy},scale={out_w}:{half_h}:force_original_aspect_ratio=decrease,"
-                f"pad={out_w}:{half_h}:(ow-iw)/2:(oh-ih)/2:color=0x0a0a0f[top_slot];"
-                f"[in_c]crop={cw}:{ch}:{cx}:{cy},scale={out_w}:{half_h}:force_original_aspect_ratio=increase,"
-                f"crop={out_w}:{half_h}[bottom_slot];"
+                f"[in_g]{game_filter}[top_slot];"
+                f"[in_c]{cam_filter}[bottom_slot];"
                 f"[top_slot][bottom_slot]vstack=inputs=2"
             )
 
@@ -112,15 +135,13 @@ def build_reframe_filter(
             # Streamer Cam on top half (1080x960), Game on bottom half (1080x960)
             return (
                 f"[0:v]split=2[in_c][in_g];"
-                f"[in_c]crop={cw}:{ch}:{cx}:{cy},scale={out_w}:{half_h}:force_original_aspect_ratio=increase,"
-                f"crop={out_w}:{half_h}[top_slot];"
-                f"[in_g]crop={gw}:{gh}:{gx}:{gy},scale={out_w}:{half_h}:force_original_aspect_ratio=decrease,"
-                f"pad={out_w}:{half_h}:(ow-iw)/2:(oh-ih)/2:color=0x0a0a0f[bottom_slot];"
+                f"[in_c]{cam_filter}[top_slot];"
+                f"[in_g]{game_filter}[bottom_slot];"
                 f"[top_slot][bottom_slot]vstack=inputs=2"
             )
 
         elif norm_layout == "pip":
-            # Picture-in-Picture: Base game in 1080x1920 + streamer camera overlay
+            # Picture-in-Picture: Base game in 1080x1920 + sharp streamer camera overlay
             bg_w = (out_w // 4 // 2) * 2
             bg_h = (out_h // 4 // 2) * 2
             return (
@@ -128,19 +149,16 @@ def build_reframe_filter(
                 f"[in_bg]scale={bg_w}:{bg_h}:force_original_aspect_ratio=increase,crop={bg_w}:{bg_h},boxblur=5:2,scale={out_w}:{out_h}[pip_bg];"
                 f"[in_game]crop={gw}:{gh}:{gx}:{gy},scale={out_w}:-2[pip_fg];"
                 f"[pip_bg][pip_fg]overlay=(W-w)/2:(H-h)/2[base_canvas];"
-                f"[in_pip]crop={cw}:{ch}:{cx}:{cy},scale=360:270:force_original_aspect_ratio=increase,crop=360:270,"
-                f"drawbox=x=0:y=0:w=360:h=270:color=white@0.85:t=3[pip_cam];"
+                f"[in_pip]crop={cw}:{ch}:{cx}:{cy},scale=360:270:force_original_aspect_ratio=decrease,"
+                f"pad=360:270:(ow-iw)/2:(oh-ih)/2:color=0x0a0a0f,drawbox=x=0:y=0:w=360:h=270:color=white@0.85:t=3[pip_cam];"
                 f"[base_canvas][pip_cam]overlay=W-w-36:H-h-240"
             )
 
     # STANDARD SINGLE REFRAME (Face tracking or full screen letterbox with aesthetic blur)
     if aspect == "9:16":
-        # If source is already approximately 9:16 vertical video
         if abs((source_w / max(1, source_h)) - (9.0 / 16.0)) < 0.05:
             return f"scale={out_w}:{out_h}"
 
-        # Ensure entire screen is 100% visible with zero horizontal cropping
-        # Full video fits cleanly in the 1080x1920 frame with aesthetic blurred background
         bg_w = (out_w // 4 // 2) * 2
         bg_h = (out_h // 4 // 2) * 2
         return (

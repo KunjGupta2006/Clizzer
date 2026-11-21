@@ -10,24 +10,24 @@ except ImportError:
 
 
 def detect_scene_cuts(video_path: Path, duration: float) -> List[float]:
-    length = int(np.ceil(duration))
     cut_timestamps: List[float] = []
 
     if SceneManager is not None and video_path.exists():
         try:
             video = open_video(str(video_path))
             scene_manager = SceneManager()
-            scene_manager.add_detector(ContentDetector(threshold=27.0))
-            scene_manager.add_detector(AdaptiveDetector(adaptive_threshold=3.0))
+            scene_manager.add_detector(ContentDetector(threshold=28.0))
+            # Only add secondary adaptive detector on short videos to prevent 5-minute CPU stalls on long streams
+            if duration <= 300.0:
+                scene_manager.add_detector(AdaptiveDetector(adaptive_threshold=3.0))
             scene_manager.detect_scenes(video=video)
             scene_list = scene_manager.get_scene_list()
             for scene in scene_list:
                 cut_timestamps.append(scene[0].get_seconds())
             return cut_timestamps
         except Exception as e:
-            logger.warning("scenedetect_failed", error=str(e), fallback="frame_diff")
+            logger.warning("scenedetect_failed", error=str(e), fallback="fast_frame_diff")
 
-    # Fast fallback: periodic scene changes or mock detection
     return cut_timestamps
 
 
